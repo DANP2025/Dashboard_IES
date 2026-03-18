@@ -1,2 +1,2 @@
-# Importar el dashboard profesional final
-exec(open('app_final_profesional.py').read())
+# Importar el dashboard optimizado para móvil
+exec(open('app_movil_optimizado.py').read())
