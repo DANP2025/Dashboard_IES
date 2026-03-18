@@ -1,2 +1,2 @@
-# Importar el dashboard con sidebar siempre visible
-exec(open('app_sidebar_visible.py').read())
+# Importar la versión simple y funcional
+exec(open('app_simple_funcional.py').read())
