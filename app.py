@@ -15,7 +15,18 @@ st.set_page_config(
 # Inicializar el gestor de datos
 @st.cache_resource
 def init_data_manager():
-    return DataManagement()
+    dm = DataManagement()
+    
+    # Verificar si hay datos, si no hay, crear datos de ejemplo
+    df = dm.load_data()
+    if df.empty:
+        st.info("📝 Creando datos de ejemplo para demostración...")
+        from datos_ejemplo_streamlit import crear_datos_para_streamlit
+        crear_datos_para_streamlit()
+        st.success("✅ Datos de ejemplo creados. Refresca la página para verlos.")
+        st.rerun()
+    
+    return dm
 
 dm = init_data_manager()
 
