@@ -1,2 +1,2 @@
-# Importar el dashboard original restaurado
-exec(open('app_original_restaurado.py').read())
+# Importar el dashboard con sidebar flotante
+exec(open('app_sidebar_flotante.py').read())
