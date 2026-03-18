@@ -1,2 +1,2 @@
-# Importar el sistema de evaluaciones detalladas
-exec(open('app_evaluaciones_detalladas.py').read())
+# Importar el dashboard profesional final
+exec(open('app_final_profesional.py').read())
