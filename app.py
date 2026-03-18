@@ -1,2 +1,2 @@
-# Importar la versión completamente funcional
-exec(open('app_todo_funcional.py').read())
+# Importar la versión completa con todo funcional
+exec(open('app_todo_completo.py').read())
