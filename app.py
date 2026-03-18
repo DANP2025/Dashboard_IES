@@ -1,2 +1,2 @@
-# Importar el dashboard responsive adaptativo
-exec(open('app_responsive_adaptativo.py').read())
+# Importar el dashboard original restaurado
+exec(open('app_original_restaurado.py').read())
