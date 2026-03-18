@@ -1,2 +1,2 @@
-# Importar la versión simple y funcional
-exec(open('app_simple_funcional.py').read())
+# Importar el dashboard completo final
+exec(open('app_completo_final.py').read())
