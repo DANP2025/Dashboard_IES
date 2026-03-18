@@ -1,2 +1,2 @@
-# Importar el sistema de asistencia diaria
-exec(open('app_asistencia_diaria.py').read())
+# Importar el sistema de evaluaciones detalladas
+exec(open('app_evaluaciones_detalladas.py').read())
