@@ -1,2 +1,2 @@
-# Importar el dashboard completo final
-exec(open('app_completo_final.py').read())
+# Importar el dashboard con evaluaciones completas
+exec(open('app_evaluaciones_completas.py').read())
