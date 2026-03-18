@@ -1,2 +1,2 @@
-# Importar el dashboard con sidebar funcional
-exec(open('app_sidebar_funcional.py').read())
+# Importar el dashboard responsive adaptativo
+exec(open('app_responsive_adaptativo.py').read())
