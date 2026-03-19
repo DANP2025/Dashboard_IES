@@ -636,29 +636,87 @@ if GOOGLE_SHEETS_DISPONIBLE:
 # Mostrar contenido según la acción seleccionada
 if st.session_state.accion_actual == "dashboard":
     st.header("📊 Dashboard General")
-    
-    total_alumnos = 65
-    total_evaluaciones = total_alumnos * 6 * 3
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("👥 Total Alumnos", total_alumnos, delta="57")
-    with col2: st.metric("📊 Promedio Asistencia", "82%", delta="3%")
-    with col3: st.metric("📝 Total Evaluaciones", total_evaluaciones, delta=f"+{total_evaluaciones - 720}")
-    with col4: st.metric("📈 Promedio General", "7.6", delta="0.2")
-    
     st.markdown("---")
-    
-    resumen_cursos = [
-        {"Curso": "EF 1A", "Alumnos": 10, "Asistencia": "85%", "Promedio": "7.8"},
-        {"Curso": "EF 2A", "Alumnos": 10, "Asistencia": "78%", "Promedio": "7.2"},
-        {"Curso": "EF 1B", "Alumnos": 10, "Asistencia": "82%", "Promedio": "7.5"},
-        {"Curso": "EF 2B", "Alumnos": 10, "Asistencia": "80%", "Promedio": "7.6"},
-        {"Curso": "TD 2A", "Alumnos": 10, "Asistencia": "76%", "Promedio": "7.2"},
-        {"Curso": "TD 2B", "Alumnos": 10, "Asistencia": "80%", "Promedio": "7.6"}
-    ]
-    df_resumen = pd.DataFrame(resumen_cursos)
-    st.dataframe(df_resumen, use_container_width=True)
-    
+
+    # Calcular datos reales desde Excel
+    try:
+        total_alumnos_real = 0
+        resumen_cursos_real = []
+        total_presentes_global = 0
+        total_dias_global = 0
+        todas_califs = []
+
+        for curso in ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]:
+            try:
+                df_c = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+                df_c = df_c[df_c["Curso"] == curso]
+                n_alumnos = len(df_c[df_c["Apellido y Nombre"].notna()])
+
+                if n_alumnos == 0:
+                    continue
+
+                total_alumnos_real += n_alumnos
+
+                # Asistencia del curso
+                cols_asist = [c for c in df_c.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                presentes_curso = sum(
+                    1 for _, r in df_c.iterrows()
+                    for c in cols_asist
+                    if pd.notna(r.get(c)) and r.get(c) == "Presente"
+                )
+                total_dias_curso = sum(
+                    1 for _, r in df_c.iterrows()
+                    for c in cols_asist
+                    if pd.notna(r.get(c))
+                )
+                pct_asist = round((presentes_curso / total_dias_curso * 100), 1) if total_dias_curso > 0 else 0
+                total_presentes_global += presentes_curso
+                total_dias_global += total_dias_curso
+
+                # Promedio evaluaciones
+                califs_curso = []
+                for _, r in df_c.iterrows():
+                    for j in range(1, 7):
+                        v = r.get(f"Calif {j}")
+                        if pd.notna(v) and str(v).strip():
+                            califs_curso.append(calificacion_a_numero(str(v)))
+                todas_califs.extend(califs_curso)
+                prom_eval = round(sum(califs_curso) / len(califs_curso), 1) if califs_curso else 0
+
+                resumen_cursos_real.append({
+                    "Curso": curso,
+                    "Alumnos": n_alumnos,
+                    "Asistencia": f"{pct_asist}%",
+                    "Promedio Eval": prom_eval
+                })
+            except Exception:
+                continue
+
+        pct_global = round((total_presentes_global / total_dias_global * 100), 1) if total_dias_global > 0 else 0
+        prom_global = round(sum(todas_califs) / len(todas_califs), 1) if todas_califs else 0
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("👥 Total Alumnos", total_alumnos_real)
+        with col2:
+            st.metric("📊 Asistencia General", f"{pct_global}%")
+        with col3:
+            st.metric("📝 Promedio Evaluaciones", prom_global)
+        with col4:
+            st.metric("📚 Cursos activos", len(resumen_cursos_real))
+
+        st.markdown("---")
+        st.subheader("📂 Resumen por Cursos")
+
+        if resumen_cursos_real:
+            df_resumen = pd.DataFrame(resumen_cursos_real)
+            st.dataframe(df_resumen, use_container_width=True)
+        else:
+            st.info("📋 No hay datos cargados aún. Usá el botón de abajo para agregar datos simulados.")
+
+    except Exception as e:
+        st.error(f"Error calculando dashboard: {e}")
+
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -667,9 +725,6 @@ if st.session_state.accion_actual == "dashboard":
                 try:
                     if agregar_datos_simulados_completos():
                         st.success("✅ Datos simulados agregados!")
-                        st.info("📊 10 alumnos por curso, 6 cursos")
-                        st.info("📝 6 evaluaciones por trimestre")
-                        st.info("📅 Datos para los 3 trimestres")
                         with st.spinner("Sincronizando con Google Sheets..."):
                             ok, mensaje = sincronizar_google_sheets()
                             if ok:
@@ -682,10 +737,10 @@ if st.session_state.accion_actual == "dashboard":
                 except Exception as e:
                     st.error(f"❌ Error: {e}")
     with col2:
-        if st.button("🔄 Actualizar Datos", type="secondary"):
+        if st.button("🔄 Actualizar Dashboard", type="secondary"):
             st.rerun()
     with col3:
-        st.write("")
+        st.write()
 
 elif st.session_state.accion_actual == "asistencia":
     st.header("📋 Gestión de Asistencia")
