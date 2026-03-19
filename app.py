@@ -508,7 +508,7 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.markdown("---")
     
     # Sistema para agregar más evaluaciones
-    st.subheader("📝 Sistema de Evaluaciones - Agregar y Modificar")
+    st.subheader("📝 Sistema de Evaluaciones - Diseño en Línea")
     
     # Opción para agregar nueva evaluación
     with st.expander("➕ Agregar Nueva Evaluación", expanded=False):
@@ -534,7 +534,7 @@ elif st.session_state.accion_actual == "evaluaciones":
     
     st.markdown("---")
     
-    # Tabla de evaluaciones (sistema como asistencia)
+    # Tabla de evaluaciones con diseño en línea
     try:
         df_evaluaciones = pd.read_excel(archivo_excel, sheet_name=trimestre_eval)
         
@@ -543,85 +543,86 @@ elif st.session_state.accion_actual == "evaluaciones":
             df_evaluaciones = df_evaluaciones[df_evaluaciones["Curso"] == curso_eval]
         
         if not df_evaluaciones.empty:
-            # Columna de evaluación actual
-            eval_col = f"Eval {numero_evaluacion}"
-            calif_col = f"Calif {numero_evaluacion}"
-            
-            # Crear tabla visual con selectboxes
-            st.write(f"📝 **Evaluación {numero_evaluacion}** - Selecciona calificación para cada alumna")
+            # Crear tabla visual con diseño en línea
+            st.write(f"📝 **Evaluaciones** - Tipo + Nombre + Calificación en la misma línea")
             
             # Inicializar estado para cambios
             if 'evaluaciones_cambios' not in st.session_state:
                 st.session_state.evaluaciones_cambios = {}
             
-            # Crear tabla visual
+            # Crear tabla visual para cada alumna
             for idx, row in df_evaluaciones.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
-                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                    # Encabezado de la alumna
+                    st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
-                    with col1:
-                        st.write(f"**{row['Apellido y Nombre']}**")
-                        st.write(f"📂 {row['Curso']}")
-                        st.write(f"📋 {row.get('Tipo Evaluación', 'Sin tipo')}")
-                    
-                    with col2:
-                        # Nombre de la evaluación
-                        nombre_eval = st.text_input(
-                            "Nombre:", 
-                            value=row.get(eval_col, f"Evaluación {numero_evaluacion}"),
-                            key=f"eval_nombre_{idx}_{numero_evaluacion}",
-                            help="Nombre de la evaluación"
-                        )
-                    
-                    with col3:
-                        # Calificación
-                        calificacion_actual = row.get(calif_col, "B")
-                        calificacion = st.selectbox(
-                            "Calif:", 
-                            ["M", "R-", "R+", "B", "MB", "EX"],
-                            index=["M", "R-", "R+", "B", "MB", "EX"].index(calificacion_actual) if calificacion_actual in ["M", "R-", "R+", "B", "MB", "EX"] else 3,
-                            key=f"eval_calif_{idx}_{numero_evaluacion}",
-                            help="Seleccionar calificación"
-                        )
-                    
-                    with col4:
-                        # Mostrar calificación actual
-                        if calificacion == "EX":
-                            st.success("🌟 EX")
-                        elif calificacion == "MB":
-                            st.success("✅ MB")
-                        elif calificacion == "B":
-                            st.info("✅ B")
-                        elif calificacion == "R+":
-                            st.warning("⚠️ R+")
-                        elif calificacion == "R-":
-                            st.error("❌ R-")
-                        else:
-                            st.error("💔 M")
-                    
-                    # Guardar cambios en sesión
-                    st.session_state.evaluaciones_cambios[f"{idx}_{numero_evaluacion}"] = {
-                        "nombre": nombre_eval,
-                        "calificacion": calificacion
-                    }
-                    
-                    st.markdown("---")
-            
-            # Mostrar nuevas evaluaciones agregadas
-            if st.session_state.nuevas_evaluaciones:
-                st.write("### 🆕 Nuevas Evaluaciones Agregadas")
-                for nueva_eval in st.session_state.nuevas_evaluaciones:
-                    st.write(f"**{nueva_eval['nombre']}** - {nueva_eval['tipo']}")
-                    
-                    # Crear campos para cada alumna
-                    for idx, row in df_evaluaciones.iterrows():
-                        if pd.notna(row["Apellido y Nombre"]):
-                            col1, col2, col3 = st.columns([3, 1, 1])
+                    # Mostrar evaluaciones existentes en línea
+                    for j in range(1, 5):  # 4 evaluaciones base
+                        eval_col = f"Eval {j}"
+                        calif_col = f"Calif {j}"
+                        
+                        if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
+                            col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
                             
                             with col1:
-                                st.write(f"**{row['Apellido y Nombre']}**")
+                                # Tipo de evaluación (usar el mismo para todas las evaluaciones de la alumna)
+                                tipo_eval = row.get('Tipo Evaluación', 'Diagnóstico')
+                                st.write(f"**📋 {tipo_eval}**")
                             
                             with col2:
+                                # Nombre de la evaluación
+                                nombre_eval_actual = st.text_input(
+                                    "Nombre:", 
+                                    value=row.get(eval_col, f"Evaluación {j}"),
+                                    key=f"eval_nombre_{idx}_{j}",
+                                    help="Nombre de la evaluación"
+                                )
+                            
+                            with col3:
+                                # Calificación
+                                calificacion_actual = row.get(calif_col, "B")
+                                calificacion = st.selectbox(
+                                    "Calif:", 
+                                    ["M", "R-", "R+", "B", "MB", "EX"],
+                                    index=["M", "R-", "R+", "B", "MB", "EX"].index(calificacion_actual) if calificacion_actual in ["M", "R-", "R+", "B", "MB", "EX"] else 3,
+                                    key=f"eval_calif_{idx}_{j}",
+                                    help="Seleccionar calificación"
+                                )
+                            
+                            with col4:
+                                # Mostrar calificación con color
+                                if calificacion == "EX":
+                                    st.success("🌟")
+                                elif calificacion == "MB":
+                                    st.success("✅")
+                                elif calificacion == "B":
+                                    st.info("✅")
+                                elif calificacion == "R+":
+                                    st.warning("⚠️")
+                                elif calificacion == "R-":
+                                    st.error("❌")
+                                else:
+                                    st.error("💔")
+                            
+                            # Guardar cambios en sesión
+                            st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
+                                "nombre": nombre_eval_actual,
+                                "calificacion": calificacion
+                            }
+                    
+                    # Mostrar nuevas evaluaciones agregadas debajo de las existentes
+                    if st.session_state.nuevas_evaluaciones:
+                        st.write("#### 🆕 Nuevas Evaluaciones Agregadas:")
+                        for nueva_eval in st.session_state.nuevas_evaluaciones:
+                            col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
+                            
+                            with col1:
+                                st.write(f"**📋 {nueva_eval['tipo']}**")
+                            
+                            with col2:
+                                st.write(f"**{nueva_eval['nombre']}**")
+                            
+                            with col3:
                                 calif_nueva = st.selectbox(
                                     "Calif:", 
                                     ["M", "R-", "R+", "B", "MB", "EX"],
@@ -629,19 +630,20 @@ elif st.session_state.accion_actual == "evaluaciones":
                                     help="Seleccionar calificación"
                                 )
                             
-                            with col3:
+                            with col4:
+                                # Mostrar calificación con color
                                 if calif_nueva == "EX":
-                                    st.success("🌟 EX")
+                                    st.success("🌟")
                                 elif calif_nueva == "MB":
-                                    st.success("✅ MB")
+                                    st.success("✅")
                                 elif calif_nueva == "B":
-                                    st.info("✅ B")
+                                    st.info("✅")
                                 elif calif_nueva == "R+":
-                                    st.warning("⚠️ R+")
+                                    st.warning("⚠️")
                                 elif calif_nueva == "R-":
-                                    st.error("❌ R-")
+                                    st.error("❌")
                                 else:
-                                    st.error("💔 M")
+                                    st.error("💔")
                     
                     st.markdown("---")
             
@@ -651,20 +653,24 @@ elif st.session_state.accion_actual == "evaluaciones":
                 if st.button("💾 Guardar Todos los Cambios", type="primary", key="guardar_todos_evaluaciones"):
                     # Aplicar todos los cambios
                     for key, cambios in st.session_state.evaluaciones_cambios.items():
-                        if str(numero_evaluacion) in key:
-                            idx = int(key.split("_")[0])
-                            df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
-                            df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
-                            
-                            # Recalcular promedio final
-                            calificaciones = []
-                            for i in range(1, 5):
-                                calif_col_temp = f"Calif {i}"
-                                if pd.notna(df_evaluaciones.at[idx, calif_col_temp]):
-                                    calificaciones.append(calificacion_a_numero(df_evaluaciones.at[idx, calif_col_temp]))
-                            
-                            promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                            df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
+                        idx = int(key.split("_")[0])
+                        j = int(key.split("_")[1])
+                        
+                        eval_col = f"Eval {j}"
+                        calif_col = f"Calif {j}"
+                        
+                        df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
+                        df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
+                        
+                        # Recalcular promedio final
+                        calificaciones = []
+                        for i in range(1, 5):
+                            calif_col_temp = f"Calif {i}"
+                            if pd.notna(df_evaluaciones.at[idx, calif_col_temp]):
+                                calificaciones.append(calificacion_a_numero(df_evaluaciones.at[idx, calif_col_temp]))
+                        
+                        promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
+                        df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
                     
                     # Guardar en Excel
                     try:
@@ -682,19 +688,21 @@ elif st.session_state.accion_actual == "evaluaciones":
                     st.rerun()
             
             with col3:
-                # Estadísticas de la evaluación
+                # Estadísticas de evaluaciones
                 calificaciones_contadas = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
                 total_evaluaciones = 0
                 
                 for idx, row in df_evaluaciones.iterrows():
                     if pd.notna(row["Apellido y Nombre"]):
-                        calif = row.get(calif_col)
-                        if pd.notna(calif) and calif in calificaciones_contadas:
-                            calificaciones_contadas[calif] += 1
-                            total_evaluaciones += 1
+                        for j in range(1, 5):
+                            calif_col = f"Calif {j}"
+                            calif = row.get(calif_col)
+                            if pd.notna(calif) and calif in calificaciones_contadas:
+                                calificaciones_contadas[calif] += 1
+                                total_evaluaciones += 1
                 
                 if total_evaluaciones > 0:
-                    st.metric(f"📊 Evaluación {numero_evaluacion}", f"{total_evaluaciones} calificadas")
+                    st.metric("📊 Total Evaluaciones", f"{total_evaluaciones}")
         else:
             st.info("📋 No hay alumnas para mostrar en este curso")
     except Exception as e:
