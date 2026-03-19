@@ -1100,6 +1100,44 @@ elif st.session_state.accion_actual == "agregar_alumno":
         st.error(f"Error: {e}")
 
 elif st.session_state.accion_actual == "estadistica":
+    st.markdown("""
+    <style>
+    .stat-card {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+        padding: 16px; border-radius: 10px; margin: 6px 0; color: white;
+    }
+    .stat-title {
+        font-size: 11px; font-weight: 600; letter-spacing: 1px;
+        text-transform: uppercase; color: #a8c8e8; margin-bottom: 4px;
+    }
+    .stat-value {
+        font-size: 26px; font-weight: 700; color: white;
+    }
+    .stat-sub { font-size: 11px; color: #7fb3d3; margin-top: 2px; }
+    .seccion-titulo {
+        font-size: 14px; font-weight: 700; color: #1e3a5f;
+        padding: 8px 0 4px 0;
+        border-bottom: 2px solid #2d6a9f; margin-bottom: 10px;
+    }
+    .badge-ex { background:#1a7a4a; color:white; padding:2px 10px;
+        border-radius:20px; font-weight:700; font-size:13px; }
+    .badge-mb { background:#2d6a9f; color:white; padding:2px 10px;
+        border-radius:20px; font-weight:700; font-size:13px; }
+    .badge-b  { background:#4a90d9; color:white; padding:2px 10px;
+        border-radius:20px; font-weight:700; font-size:13px; }
+    .badge-rp { background:#e8a020; color:white; padding:2px 10px;
+        border-radius:20px; font-weight:700; font-size:13px; }
+    .badge-rm { background:#d4601a; color:white; padding:2px 10px;
+        border-radius:20px; font-weight:700; font-size:13px; }
+    .badge-m  { background:#c0392b; color:white; padding:2px 10px;
+        border-radius:20px; font-weight:700; font-size:13px; }
+    .eval-row {
+        display: flex; align-items: center; padding: 8px 4px;
+        border-bottom: 1px solid #eee;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.header("📈 Análisis Estadístico Individual")
     st.markdown("---")
     
@@ -1246,24 +1284,26 @@ elif st.session_state.accion_actual == "estadistica":
                                 "R-": "badge-rm", "M": "badge-m"
                             }
                             badge_class = badges.get(calif, "badge-b")
-                            col1, col2, col3 = st.columns([1, 5, 2])
+                            col1, col2, col3 = st.columns([1, 5, 3])
                             with col1:
                                 st.markdown(
-                                    f"<div style='padding:8px;text-align:center;"
-                                    f"font-weight:700;color:#1e3a5f;'>#{ev['N°']}</div>",
+                                    f"<div style='padding:6px 4px;text-align:center;"
+                                    f"font-weight:700;color:#1e3a5f;font-size:14px;'>"
+                                    f"#{ev['N°']}</div>",
                                     unsafe_allow_html=True
                                 )
                             with col2:
                                 st.markdown(
-                                    f"<div style='padding:8px;color:#2c3e50;"
-                                    f"font-size:15px;'>{ev['Evaluación']}</div>",
+                                    f"<div style='padding:6px 4px;color:#2c3e50;"
+                                    f"font-size:14px;line-height:1.4;'>"
+                                    f"{ev['Evaluación']}</div>",
                                     unsafe_allow_html=True
                                 )
                             with col3:
                                 st.markdown(
-                                    f"<div style='padding:8px;text-align:center;'>"
+                                    f"<div style='padding:6px 4px;'>"
                                     f"<span class='{badge_class}'>"
-                                    f"{calif} — {ev['Valor']}</span></div>",
+                                    f"{calif} ({ev['Valor']})</span></div>",
                                     unsafe_allow_html=True
                                 )
 
