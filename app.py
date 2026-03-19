@@ -23,11 +23,12 @@ st.write("🚀 Configuración segura vía Streamlit Secrets")
 try:
     CREDENTIALS = dict(st.secrets["gcp_service_account"])
     CREDENTIALS["private_key"] = CREDENTIALS["private_key"].replace("\\n", "\n")
+    FOLDER_ID = st.secrets["folder_id"]
     st.success("✅ Credenciales cargadas correctamente!")
     st.info(f"📧 Email: {CREDENTIALS['client_email']}")
-    st.info(f"🆔 Project ID: {CREDENTIALS['project_id']}")
+    st.info(f"📁 Carpeta destino configurada")
 except Exception as e:
-    st.error(f"❌ No se encontraron las credenciales: {e}")
+    st.error(f"❌ Error cargando credenciales: {e}")
     st.stop()
 
 st.markdown("---")
@@ -47,37 +48,28 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
             ]
 
             creds = Credentials.from_service_account_info(CREDENTIALS, scopes=scope)
-            client = gspread.authorize(creds)
-
-            spreadsheet = client.create("Dashboard IES - Backup Automático")
-
-            spreadsheet.share(
-                "solpeschuk@gmail.com",
-                perm_type="user",
-                role="writer"
-            )
-
             drive_service = build("drive", "v3", credentials=creds)
 
-            file_id = spreadsheet.id
+            file_metadata = {
+                "name": "Dashboard IES - Backup Automático",
+                "mimeType": "application/vnd.google-apps.spreadsheet",
+                "parents": [FOLDER_ID]
+            }
 
-            file = drive_service.files().get(
-                fileId=file_id,
-                fields="parents"
+            file = drive_service.files().create(
+                body=file_metadata,
+                fields="id, webViewLink"
             ).execute()
 
-            previous_parents = ",".join(file.get("parents", []))
-
-            drive_service.files().update(
-                fileId=file_id,
-                addParents="root",
-                removeParents=previous_parents,
-                fields="id, parents"
-            ).execute()
+            file_id = file.get("id")
+            file_url = file.get("webViewLink")
 
             st.success("✅ Conexión exitosa con Google Drive!")
-            st.info(f"📁 Spreadsheet creado: {spreadsheet.url}")
-            st.info("🎉 El archivo fue movido a tu Google Drive personal!")
+            st.info(f"📁 Spreadsheet creado en tu Drive: {file_url}")
+            st.info("🎉 El archivo está directamente en tu carpeta personal!")
+
+            client = gspread.authorize(creds)
+            spreadsheet = client.open_by_key(file_id)
 
             test_data = pd.DataFrame({
                 "Test": ["Backup Configurado Automáticamente"],
@@ -114,7 +106,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("📁 Credenciales", "✅ Seguras")
 with col2:
-    st.metric("🔧 Método", "Streamlit Secrets")
+    st.metric("🔧 Carpeta", "Tu Drive Personal")
 with col3:
     st.metric("📧 Email", "solpeschuk@gmail.com")
 
