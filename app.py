@@ -6,8 +6,6 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 import random
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 st.set_page_config(page_title="Sistema Educativo", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
 
@@ -262,6 +260,28 @@ def obtener_alumnos_disponibles():
         except:
             pass
     return ["Todos"]
+
+def crear_grafico_asistencia(presentes, ausentes, nombre_alumno):
+    """Crear gráfico de asistencia usando Streamlit"""
+    data = {
+        'Estado': ['Presentes', 'Ausentes'],
+        'Cantidad': [presentes, ausentes]
+    }
+    df_grafico = pd.DataFrame(data)
+    
+    # Usar colores personalizados
+    color_map = {'Presentes': '#4CAF50', 'Ausentes': '#F44336'}
+    
+    st.bar_chart(df_grafico.set_index('Estado'), color=[color_map[estado] for estado in df_grafico['Estado']])
+    st.caption(f"📊 Distribución de Asistencia - {nombre_alumno}")
+
+def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
+    """Crear gráfico de evaluaciones usando Streamlit"""
+    df_grafico = pd.DataFrame(evaluaciones_data)
+    
+    if not df_grafico.empty:
+        st.bar_chart(df_grafico.set_index('Evaluación')['Valor Numérico'], color='#FF6B6B')
+        st.caption(f"📈 Rendimiento en Evaluaciones - {nombre_alumno}")
 
 archivo_excel = crear_excel_si_no_existe()
 
@@ -771,6 +791,7 @@ elif st.session_state.accion_actual == "reporte":
                     columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
                     presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
                     totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                    ausentes = totales - presentes
                     porcentaje = (presentes / totales * 100) if totales > 0 else 0
                     
                     # Aplicar criterio exacto de nota de asistencia
@@ -786,21 +807,14 @@ elif st.session_state.accion_actual == "reporte":
                     
                     col1, col2, col3, col4 = st.columns(4)
                     with col1: st.metric("📊 Días Presentes", presentes)
-                    with col2: st.metric("📊 Total Días", totales)
+                    with col2: st.metric("📊 Días Ausentes", ausentes)
                     with col3: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
                     with col4: st.metric("📊 Nota Asistencia", f"{color_asistencia} {nota_asistencia}")
                     
-                    # Gráfico de asistencia
+                    # Gráfico de asistencia usando Streamlit
                     st.markdown("---")
                     st.write("### 📈 Gráfico de Asistencia")
-                    fig, ax = plt.subplots(figsize=(8, 4))
-                    asistencia_data = ['Presentes', 'Ausentes']
-                    asistencia_values = [presentes, totales - presentes]
-                    colors = ['#4CAF50', '#F44336']
-                    
-                    ax.pie(asistencia_values, labels=asistencia_data, autopct='%1.1f%%', colors=colors, startangle=90)
-                    ax.set_title(f'Distribución de Asistencia - {row["Apellido y Nombre"]}')
-                    st.pyplot(fig)
+                    crear_grafico_asistencia(presentes, ausentes, row["Apellido y Nombre"])
                     
                     st.markdown("---")
                     
@@ -816,7 +830,7 @@ elif st.session_state.accion_actual == "reporte":
                             evaluaciones_data.append({
                                 "Evaluación": row[eval_col],
                                 "Calificación": row[calif_col],
-                                "Valor": calificacion_a_numero(row[calif_col])
+                                "Valor Numérico": calificacion_a_numero(row[calif_col])
                             })
                             calificaciones.append(calificacion_a_numero(row[calif_col]))
                     
@@ -850,40 +864,23 @@ elif st.session_state.accion_actual == "reporte":
                             
                             st.metric("📊 Calificación Final", f"{color_final} {calif_final}")
                         
-                        # Gráfico de evaluaciones
+                        # Gráfico de evaluaciones usando Streamlit
                         st.markdown("---")
                         st.write("### 📈 Gráfico de Evaluaciones")
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        
-                        eval_nombres = [eval_data["Evaluación"] for eval_data in evaluaciones_data]
-                        eval_valores = [eval_data["Valor"] for eval_data in evaluaciones_data]
-                        
-                        bars = ax.bar(eval_nombres, eval_valores, color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'])
-                        ax.set_title(f'Rendimiento en Evaluaciones - {row["Apellido y Nombre"]}')
-                        ax.set_xlabel('Evaluaciones')
-                        ax.set_ylabel('Calificación Numérica')
-                        ax.set_ylim(0, 10)
-                        
-                        # Añadir etiquetas de valor
-                        for bar, valor in zip(bars, eval_valores):
-                            height = bar.get_height()
-                            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
-                                    f'{valor}', ha='center', va='bottom')
-                        
-                        plt.xticks(rotation=45, ha='right')
-                        plt.tight_layout()
-                        st.pyplot(fig)
+                        crear_grafico_evaluaciones(evaluaciones_data, row["Apellido y Nombre"])
                     
                     st.markdown("---")
                     
                     # Resumen General
                     st.write("## 📈 Resumen General")
-                    promedio_general = (nota_asistencia.split('(')[1].replace(')', '').strip() + f" {promedio_final:.1f}") if '(' in nota_asistencia else f"{promedio_final:.1f}"
+                    nota_asistencia_num = calcular_nota_asistencia(presentes, totales)
+                    promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
+                    promedio_general = (nota_asistencia_num + promedio_eval) / 2 if calificaciones else nota_asistencia_num
                     
                     col1, col2, col3 = st.columns(3)
-                    with col1: st.metric("📊 Nota Asistencia", nota_asistencia)
-                    with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_final:.1f}")
-                    with col3: st.metric("📊 Promedio General", f"{((calificacion_a_numero(nota_asistencia.split('(')[1].replace(')', '').strip()) + promedio_final) / 2):.1f}" if '(' in nota_asistencia else f"{promedio_final:.1f}")
+                    with col1: st.metric("📊 Nota Asistencia", f"{nota_asistencia_num:.1f}")
+                    with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_eval:.1f}")
+                    with col3: st.metric("📊 Promedio General", f"{promedio_general:.1f}")
                     
                     break  # Solo mostrar el primer alumno encontrado
         else:
@@ -987,33 +984,14 @@ elif st.session_state.accion_actual == "estadistica":
                             st.write("#### 📈 Resumen Numérico de Evaluaciones")
                             col1, col2, col3, col4 = st.columns(4)
                             with col1: st.metric("📊 Promedio Final", f"{promedio_final:.1f}")
-                            with col2: st.metric("📊 Calificación Más Alta", f"{max_calification:.1f}")
-                            with col3: st.metric("📊 Calificación Más Baja", f"{min_calification:.1f}")
+                            with col2: st.metric("📊 Calificación Más Alta", f"{max_calificacion:.1f}")
+                            with col3: st.metric("📊 Calificación Más Baja", f"{min_calificacion:.1f}")
                             with col4: st.metric("📊 Total Evaluaciones", len(calificaciones))
                             
-                            # Gráfico de barras de evaluaciones
+                            # Gráfico de barras de evaluaciones usando Streamlit
                             st.markdown("---")
                             st.write("#### 📈 Gráfico de Desempeño por Evaluación")
-                            fig, ax = plt.subplots(figsize=(12, 6))
-                            
-                            eval_nombres = [eval_data["Evaluación"] for eval_data in evaluaciones_detalle]
-                            eval_valores = [eval_data["Valor Numérico"] for eval_data in evaluaciones_detalle]
-                            
-                            bars = ax.bar(eval_nombres, eval_valores, color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'])
-                            ax.set_title(f'Desempeño Detallado - {row["Apellido y Nombre"]}')
-                            ax.set_xlabel('Evaluaciones')
-                            ax.set_ylabel('Calificación Numérica')
-                            ax.set_ylim(0, 10)
-                            
-                            # Añadir etiquetas de valor
-                            for bar, valor in zip(bars, eval_valores):
-                                height = bar.get_height()
-                                ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
-                                        f'{valor}', ha='center', va='bottom')
-                            
-                            plt.xticks(rotation=45, ha='right')
-                            plt.tight_layout()
-                            st.pyplot(fig)
+                            crear_grafico_evaluaciones(evaluaciones_detalle, row["Apellido y Nombre"])
                     
                     st.markdown("---")
                     
