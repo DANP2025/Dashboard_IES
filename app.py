@@ -9,7 +9,7 @@ import random
 
 st.set_page_config(page_title="Sistema Educativo", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
 
-# Sidebar con ACCIONES (solo títulos)
+# Sidebar con ACCIONES
 st.sidebar.header("🎯 ACCIONES")
 
 # Agregar Alumno
@@ -38,10 +38,14 @@ st.sidebar.markdown("---")
 if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backup_principal"):
     st.sidebar.success("✅ Guardado local completado!")
     # Generar backup detallado
-    if generar_backup_detalles():
-        st.sidebar.success("✅ Backup en Excel generado exitosamente!")
-    else:
-        st.sidebar.error("❌ Error generando backup")
+    try:
+        if generar_backup_detalles():
+            st.sidebar.success("✅ Backup en Excel generado exitosamente!")
+            st.sidebar.info(f"📁 Archivo: backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+        else:
+            st.sidebar.error("❌ Error generando backup")
+    except Exception as e:
+        st.sidebar.error(f"❌ Error: {e}")
 
 # Inicializar estado
 if 'accion_actual' not in st.session_state:
@@ -143,11 +147,20 @@ def generar_backup_detalles():
         st.error(f"Error generando backup: {e}")
         return False
 
+def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
+    """Función para guardar datos en Excel con manejo de errores"""
+    try:
+        with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Error guardando en Excel: {e}")
+        return False
+
 def agregar_datos_simulados_completos():
     archivo_excel = "sistema_educativo.xlsx"
     if os.path.exists(archivo_excel):
         try:
-            # Nombres femeninos para simulación
             nombres_femeninos = [
                 "García López, Sofía María", "Rodríguez Martínez, Ana Isabel", "Fernández García, Laura Patricia",
                 "Sánchez Hernández, María José", "López Torres, Carmen Rosa", "Pérez Díaz, Beatriz Elena",
@@ -155,7 +168,6 @@ def agregar_datos_simulados_completos():
                 "Alvarez Moreno, Isabel Cristina"
             ]
             
-            # Agregar 5 nombres adicionales para EF 1A
             nombres_adicionales_ef1a = [
                 "Hernández González, Luciana Beatriz", "Mendoza Silva, Valentina Sofía", "Castro Ramos, Isabella Gabriela",
                 "Vargas Morales, Emilia Alejandra", "Ortiz Ruiz, Camila Victoria"
@@ -163,45 +175,40 @@ def agregar_datos_simulados_completos():
             
             cursos = ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
             
-            # Generar datos para los 3 trimestres
             for trimestre_num in range(1, 4):
                 nombre_trimestre = f"{trimestre_num} Trimestre"
                 datos_trimestre = []
                 
                 for curso in cursos:
-                    # Determinar cuántos alumnos por curso
                     if curso == "EF 1A":
-                        nombres_curso = nombres_femeninos[:10] + nombres_adicionales_ef1a  # 15 alumnos
+                        nombres_curso = nombres_femeninos[:10] + nombres_adicionales_ef1a
                     else:
-                        nombres_curso = nombres_femeninos[:10]  # 10 alumnos
+                        nombres_curso = nombres_femeninos[:10]
                     
                     for i, nombre in enumerate(nombres_curso):
-                        # Generar asistencia aleatoria para el trimestre
                         asistencia_data = {}
                         for dia in range(1, 32):
-                            if dia <= 31:  # Marzo
+                            if dia <= 31:
                                 fecha_key = f"Mar-{dia:02d}"
                                 asistencia_data[fecha_key] = "Presente" if random.random() > 0.2 else "Ausente"
-                            elif dia <= 61:  # Abril
+                            elif dia <= 61:
                                 fecha_key = f"Abr-{(dia-31):02d}"
                                 asistencia_data[fecha_key] = "Presente" if random.random() > 0.2 else "Ausente"
-                            elif dia <= 92:  # Mayo
+                            elif dia <= 92:
                                 fecha_key = f"May-{(dia-61):02d}"
                                 asistencia_data[fecha_key] = "Presente" if random.random() > 0.2 else "Ausente"
                         
-                        # Calcular nota de asistencia con criterio exacto
                         presentes = sum(1 for v in asistencia_data.values() if v == "Presente")
                         totales = len(asistencia_data)
                         porcentaje = (presentes / totales) * 100 if totales > 0 else 0
                         
                         if porcentaje >= 80:
-                            nota_asistencia = 10  # EX
+                            nota_asistencia = 10
                         elif porcentaje >= 51:
-                            nota_asistencia = 8   # R+
+                            nota_asistencia = 8
                         else:
-                            nota_asistencia = 5   # M
+                            nota_asistencia = 5
                         
-                        # Generar 6 evaluaciones por trimestre con datos falsos
                         tipos_eval = ["Diagnóstico", "Físico", "Técnico", "Desempeño global"]
                         calificaciones = ["M", "R-", "R+", "B", "MB", "EX"]
                         nombres_eval = ["Evaluación Diagnóstica", "Test Físico", "Proyecto Técnico", "Evaluación Global", "Trabajo Práctico", "Exposición Oral"]
@@ -214,14 +221,12 @@ def agregar_datos_simulados_completos():
                             "Observaciones": f"Alumna {curso}, desempeño {'excelente' if nota_asistencia >= 8 else 'regular' if nota_asistencia >= 6 else 'necesita mejorar'}"
                         }
                         
-                        # Agregar 6 evaluaciones con datos falsos
                         for j in range(1, 7):
                             eval_nombre = nombres_eval[j-1]
                             eval_calif = random.choice(calificaciones)
                             evaluacion_data[f"Eval {j}"] = eval_nombre
                             evaluacion_data[f"Calif {j}"] = eval_calif
                         
-                        # Calcular promedio final de evaluaciones
                         califs_numericas = []
                         for j in range(1, 7):
                             calif = evaluacion_data[f"Calif {j}"]
@@ -235,14 +240,14 @@ def agregar_datos_simulados_completos():
                         promedio_final = sum(califs_numericas) / len(califs_numericas) if califs_numericas else 0
                         evaluacion_data["Nota Final Evaluaciones"] = round(promedio_final, 1)
                         
-                        # Combinar datos
                         datos_alumna = {**asistencia_data, **evaluacion_data}
                         datos_trimestre.append(datos_alumna)
                 
-                # Guardar en el trimestre correspondiente
                 df_trimestre = pd.DataFrame(datos_trimestre)
-                with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                    df_trimestre.to_excel(writer, sheet_name=nombre_trimestre, index=False)
+                if guardar_datos_excel(df_trimestre, nombre_trimestre, archivo_excel):
+                    continue
+                else:
+                    return False
             
             return True
         except Exception as e:
@@ -254,12 +259,10 @@ def agregar_nuevo_alumno(nombre, curso):
     archivo_excel = "sistema_educativo.xlsx"
     if os.path.exists(archivo_excel):
         try:
-            # Agregar a los 3 trimestres
             for trimestre_num in range(1, 4):
                 nombre_trimestre = f"{trimestre_num} Trimestre"
                 df_existente = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
                 
-                # Crear nueva fila para el alumno
                 nuevo_alumno = {
                     "Apellido y Nombre": nombre,
                     "Curso": curso,
@@ -268,28 +271,26 @@ def agregar_nuevo_alumno(nombre, curso):
                     "Observaciones": "Nuevo alumno"
                 }
                 
-                # Agregar columnas de asistencia
                 for dia in range(1, 32):
-                    if dia <= 31:  # Marzo
+                    if dia <= 31:
                         nuevo_alumno[f"Mar-{dia:02d}"] = "Ausente"
-                    elif dia <= 61:  # Abril
+                    elif dia <= 61:
                         nuevo_alumno[f"Abr-{(dia-31):02d}"] = "Ausente"
-                    elif dia <= 92:  # Mayo
+                    elif dia <= 92:
                         nuevo_alumno[f"May-{(dia-61):02d}"] = "Ausente"
                 
-                # Agregar evaluaciones (ahora 6)
                 for j in range(1, 7):
                     nuevo_alumno[f"Eval {j}"] = f"Evaluación {j}"
                     nuevo_alumno[f"Calif {j}"] = "B"
                 
                 nuevo_alumno["Nota Final Evaluaciones"] = 8.0
                 
-                # Agregar al DataFrame
                 df_actualizado = pd.concat([df_existente, pd.DataFrame([nuevo_alumno])], ignore_index=True)
                 
-                # Guardar
-                with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                    df_actualizado.to_excel(writer, sheet_name=nombre_trimestre, index=False)
+                if guardar_datos_excel(df_actualizado, nombre_trimestre, archivo_excel):
+                    continue
+                else:
+                    return False
             
             return True
         except Exception as e:
@@ -297,26 +298,16 @@ def agregar_nuevo_alumno(nombre, curso):
             return False
     return False
 
-def backup_google_sheets():
-    try:
-        sheet_url = "https://docs.google.com/spreadsheets/d/10sSBzhpkEPYk78jEctV6XzRoyFJpaYznQPnv9T6VpPc/edit?usp=drive_link"
-        st.success("✅ Backup en Google Sheets completado!")
-        st.info(f"📊 Datos guardados en: {sheet_url}")
-        return True
-    except Exception as e:
-        st.error(f"Error en backup: {e}")
-        return False
-
 def calcular_nota_asistencia(presentes, totales):
     if totales == 0:
         return 0
     porcentaje = (presentes / totales) * 100
     if porcentaje >= 80:
-        return 10  # EX
+        return 10
     elif porcentaje >= 51:
-        return 8   # R+
+        return 8
     else:
-        return 5   # M
+        return 5
 
 def calificacion_a_numero(calif):
     calif = str(calif).upper().strip()
@@ -343,21 +334,13 @@ def obtener_alumnos_disponibles():
     return ["Todos"]
 
 def crear_grafico_asistencia(presentes, ausentes, nombre_alumno):
-    """Crear gráfico de asistencia usando Streamlit"""
-    data = {
-        'Estado': ['Presentes', 'Ausentes'],
-        'Cantidad': [presentes, ausentes]
-    }
+    data = {'Estado': ['Presentes', 'Ausentes'], 'Cantidad': [presentes, ausentes]}
     df_grafico = pd.DataFrame(data)
-    
-    # Usar un solo color para Streamlit
     st.bar_chart(df_grafico.set_index('Estado'))
     st.caption(f"📊 Distribución de Asistencia - {nombre_alumno}")
 
 def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
-    """Crear gráfico de evaluaciones usando Streamlit"""
     df_grafico = pd.DataFrame(evaluaciones_data)
-    
     if not df_grafico.empty:
         st.bar_chart(df_grafico.set_index('Evaluación')['Valor Numérico'])
         st.caption(f"📈 Rendimiento en Evaluaciones - {nombre_alumno}")
@@ -368,9 +351,8 @@ archivo_excel = crear_excel_si_no_existe()
 if st.session_state.accion_actual == "dashboard":
     st.header("📊 Dashboard General")
     
-    # Métricas principales actualizadas
-    total_alumnos = 65  # 60 + 5 adicionales en EF 1A
-    total_evaluaciones = total_alumnos * 6 * 3  # 6 evaluaciones por trimestre
+    total_alumnos = 65
+    total_evaluaciones = total_alumnos * 6 * 3
     
     col1, col2, col3, col4 = st.columns(4)
     with col1: st.metric("👥 Total Alumnos", total_alumnos, delta="57")
@@ -381,7 +363,7 @@ if st.session_state.accion_actual == "dashboard":
     st.markdown("---")
     st.subheader("📂 Resumen por Cursos")
     resumen_cursos = [
-        {"Curso": "EF 1A", "Alumnos": 15, "Asistencia": "85%", "Promedio": "8.2"},  # 15 ahora
+        {"Curso": "EF 1A", "Alumnos": 15, "Asistencia": "85%", "Promedio": "8.2"},
         {"Curso": "EF 2A", "Alumnos": 10, "Asistencia": "78%", "Promedio": "7.5"},
         {"Curso": "EF 1B", "Alumnos": 10, "Asistencia": "90%", "Promedio": "8.8"},
         {"Curso": "EF 2B", "Alumnos": 10, "Asistencia": "82%", "Promedio": "7.9"},
@@ -392,40 +374,6 @@ if st.session_state.accion_actual == "dashboard":
     st.dataframe(df_resumen, use_container_width=True)
     
     st.markdown("---")
-    st.subheader("👥 Alumnas por Curso (5+ por curso) - 3 Trimestres")
-    
-    # Mostrar tabla con 5+ alumnas por curso para los 3 trimestres
-    try:
-        for trimestre_num in range(1, 4):
-            st.write(f"### 📅 {trimestre_num} Trimestre")
-            df_todas = pd.read_excel(archivo_excel, sheet_name=f"{trimestre_num} Trimestre")
-            
-            if not df_todas.empty:
-                # Agrupar por curso y mostrar primeras 5 alumnas
-                cursos_unicos = df_todas["Curso"].unique()
-                
-                for curso in sorted(cursos_unicos):
-                    st.write(f"#### 📂 {curso}")
-                    alumnas_curso = df_todas[df_todas["Curso"] == curso][["Apellido y Nombre", "Curso", "Nota Asistencia", "Nota Final Evaluaciones"]]
-                    
-                    if not alumnas_curso.empty:
-                        # Mostrar primeras 5 alumnas
-                        alumnas_mostradas = alumnas_curso.head(5)
-                        st.dataframe(alumnas_mostradas, use_container_width=True)
-                        
-                        # Si hay más de 5, mostrar indicador
-                        if len(alumnas_curso) > 5:
-                            st.caption(f"... y {len(alumnas_curso) - 5} alumnas más en este curso")
-                    st.markdown("---")
-            else:
-                st.info("📋 No hay alumnas registradas")
-            
-            st.markdown("---")
-    except Exception as e:
-        st.error(f"Error: {e}")
-        st.info("📊 Agrega datos simulados para probar")
-    
-    st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📊 Agregar Datos Simulados Completos", type="primary"):
@@ -434,28 +382,24 @@ if st.session_state.accion_actual == "dashboard":
                 st.info(f"📊 {total_alumnos} alumnas agregadas")
                 st.info("📝 6 evaluaciones por trimestre por alumna")
                 st.info("📅 Datos para los 3 trimestres")
-                st.info("🎯 EF 1A tiene 15 alumnas (5 adicionales)")
-                st.info("👀 Mostrando 5+ alumnas por curso")
                 st.rerun()
     with col2:
         if st.button("🔄 Actualizar Datos", type="secondary"):
             st.rerun()
     with col3:
-        if st.button("💾 Backup en Google Sheets", type="secondary"):
-            backup_google_sheets()
+        st.write("")  # Espacio
 
 elif st.session_state.accion_actual == "agregar_alumno":
     st.header("👤 Agregar Nuevo Alumno")
     st.markdown("---")
     
-    # Formulario para agregar nuevo alumno
     col1, col2, col3 = st.columns(3)
     with col1:
         nuevo_nombre = st.text_input("📝 Nombre Completo del Alumno:", key="nuevo_nombre_alumno")
     with col2:
         nuevo_curso = st.selectbox("📂 Curso:", ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="nuevo_curso_alumno")
     with col3:
-        st.write("")  # Espacio
+        st.write("")
     
     st.markdown("---")
     
@@ -475,13 +419,12 @@ elif st.session_state.accion_actual == "agregar_alumno":
         if st.button("🔄 Limpiar Formulario", type="secondary", key="btn_limpiar_formulario"):
             st.rerun()
     with col3:
-        st.write("")  # Espacio
+        st.write("")
 
 elif st.session_state.accion_actual == "asistencia":
     st.header("📋 Gestión de Asistencia")
     st.markdown("---")
     
-    # Filtros visuales optimizados
     col1, col2, col3 = st.columns(3)
     with col1:
         curso_asistencia = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="asistencia_curso")
@@ -492,31 +435,25 @@ elif st.session_state.accion_actual == "asistencia":
     
     st.markdown("---")
     
-    # Tabla completa de asistencia visual
     st.subheader("📋 Registro de Asistencia - Marcar Rápidamente")
     
     try:
         df_asistencia = pd.read_excel(archivo_excel, sheet_name=trimestre_asistencia)
         
-        # Aplicar filtros
         if curso_asistencia != "Todos":
             df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
         
         if not df_asistencia.empty:
             fecha_str = fecha_seleccionada.strftime("%b-%d")
             
-            # Crear columna si no existe
             if fecha_str not in df_asistencia.columns:
                 df_asistencia[fecha_str] = "Ausente"
             
-            # Crear tabla visual con checkboxes
             st.write("✅ Marca la casilla para **Presente** - ❌ Casilla sin marcar = **Ausente**")
             
-            # Inicializar estado para cambios
             if 'asistencia_cambios' not in st.session_state:
                 st.session_state.asistencia_cambios = {}
             
-            # Crear tabla visual
             for idx, row in df_asistencia.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
                     col1, col2, col3 = st.columns([3, 1, 1])
@@ -526,10 +463,8 @@ elif st.session_state.accion_actual == "asistencia":
                         st.write(f"📂 {row['Curso']}")
                     
                     with col2:
-                        # Estado actual
                         estado_actual = row[fecha_str] if pd.notna(row[fecha_str]) else "Ausente"
                         
-                        # Checkbox visual
                         presente = st.checkbox(
                             "✅", 
                             value=(estado_actual == "Presente"),
@@ -537,7 +472,6 @@ elif st.session_state.accion_actual == "asistencia":
                             help="Marcar como Presente"
                         )
                         
-                        # Guardar cambio
                         st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = presente
                     
                     with col3:
@@ -548,17 +482,16 @@ elif st.session_state.accion_actual == "asistencia":
                     
                     st.markdown("---")
             
-            # Solo botón de guardado masivo
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("💾 Guardar Todos los Cambios", type="primary", key="guardar_todos_asistencia"):
-                    # Aplicar todos los cambios
+                    cambios_guardados = 0
                     for key, presente in st.session_state.asistencia_cambios.items():
                         if fecha_str in key:
                             idx = int(key.split("_")[0])
                             df_asistencia.at[idx, fecha_str] = "Presente" if presente else "Ausente"
+                            cambios_guardados += 1
                     
-                    # Recalcular notas de asistencia
                     columnas_asistencia = [col for col in df_asistencia.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
                     for idx, row in df_asistencia.iterrows():
                         if pd.notna(row["Apellido y Nombre"]):
@@ -567,15 +500,13 @@ elif st.session_state.accion_actual == "asistencia":
                             nota_asistencia = calcular_nota_asistencia(presentes, totales)
                             df_asistencia.at[idx, "Nota Asistencia"] = nota_asistencia
                     
-                    # Guardar en Excel
-                    try:
-                        with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                            df_asistencia.to_excel(writer, sheet_name=trimestre_asistencia, index=False)
-                        st.success("✅ Todos los cambios guardados!")
+                    if guardar_datos_excel(df_asistencia, trimestre_asistencia, archivo_excel):
+                        st.success(f"✅ {cambios_guardados} cambios guardados!")
+                        st.info(f"📁 Datos guardados en: {os.path.abspath(archivo_excel)}")
                         st.session_state.asistencia_cambios = {}
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Error guardando: {e}")
+                    else:
+                        st.error("❌ Error guardando cambios")
             
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_asistencia"):
@@ -583,7 +514,6 @@ elif st.session_state.accion_actual == "asistencia":
                     st.rerun()
             
             with col3:
-                # Estadísticas del día
                 presentes_dia = 0
                 total_dia = 0
                 
@@ -608,7 +538,6 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.header("📝 Gestión de Evaluaciones")
     st.markdown("---")
     
-    # Filtros visuales (SIN filtro de número de evaluación)
     col1, col2 = st.columns(2)
     with col1:
         curso_eval = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="eval_curso")
@@ -617,10 +546,8 @@ elif st.session_state.accion_actual == "evaluaciones":
     
     st.markdown("---")
     
-    # Sistema para agregar más evaluaciones
     st.subheader("📝 Sistema de Evaluaciones - Formato Consistente")
     
-    # Opción para agregar nueva evaluación
     with st.expander("➕ Agregar Nueva Evaluación", expanded=False):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -630,11 +557,10 @@ elif st.session_state.accion_actual == "evaluaciones":
         with col3:
             if st.button("➕ Agregar Evaluación", type="primary", key="btn_agregar_nueva_eval"):
                 if nuevo_nombre_eval:
-                    # Agregar a la lista de nuevas evaluaciones
                     st.session_state.nuevas_evaluaciones.append({
                         "nombre": nuevo_nombre_eval,
                         "tipo": nuevo_tipo_eval,
-                        "numero": len(st.session_state.nuevas_evaluaciones) + 7  # Empezar desde 7 (después de las 6 base)
+                        "numero": len(st.session_state.nuevas_evaluaciones) + 7
                     })
                     st.success(f"✅ Evaluación '{nuevo_nombre_eval}' agregada!")
                     st.info(f"📋 Tipo: {nuevo_tipo_eval}")
@@ -644,45 +570,35 @@ elif st.session_state.accion_actual == "evaluaciones":
     
     st.markdown("---")
     
-    # Tabla de evaluaciones con formato consistente
     try:
         df_evaluaciones = pd.read_excel(archivo_excel, sheet_name=trimestre_eval)
         
-        # Aplicar filtros
         if curso_eval != "Todos":
             df_evaluaciones = df_evaluaciones[df_evaluaciones["Curso"] == curso_eval]
         
         if not df_evaluaciones.empty:
-            # Crear tabla visual con formato consistente
             st.write("📝 **Evaluaciones** - Formato consistente (nombre arriba, nombre abajo)")
             
-            # Inicializar estado para cambios
             if 'evaluaciones_cambios' not in st.session_state:
                 st.session_state.evaluaciones_cambios = {}
             
-            # Crear tabla visual para cada alumna
             for idx, row in df_evaluaciones.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
-                    # Encabezado de la alumna
                     st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
-                    # Mostrar evaluaciones existentes con formato consistente
-                    for j in range(1, 7):  # 6 evaluaciones base
+                    for j in range(1, 7):
                         eval_col = f"Eval {j}"
                         calif_col = f"Calif {j}"
                         
                         if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
-                            # Formato consistente: nombre arriba, nombre abajo
                             col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
                             
                             with col1:
-                                # Tipo de evaluación (arriba)
                                 tipo_eval = row.get('Tipo Evaluación', 'Diagnóstico')
                                 st.write(f"**📋 {tipo_eval}**")
                                 st.write("Nombre:")
                             
                             with col2:
-                                # Nombre de la evaluación (arriba y abajo)
                                 nombre_eval_actual = st.text_input(
                                     "", 
                                     value=row.get(eval_col, f"Evaluación {j}"),
@@ -692,7 +608,6 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 st.write(f"**{nombre_eval_actual}**")
                             
                             with col3:
-                                # Calificación
                                 calificacion_actual = row.get(calif_col, "B")
                                 calificacion = st.selectbox(
                                     "Calif:", 
@@ -703,7 +618,6 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 )
                             
                             with col4:
-                                # Mostrar calificación con color
                                 if calificacion == "EX":
                                     st.success("🌟")
                                 elif calificacion == "MB":
@@ -717,25 +631,20 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 else:
                                     st.error("💔")
                             
-                            # Guardar cambios en sesión
                             st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
                                 "nombre": nombre_eval_actual,
                                 "calificacion": calificacion
                             }
                     
-                    # Mostrar nuevas evaluaciones agregadas con formato consistente
                     if st.session_state.nuevas_evaluaciones:
                         for nueva_eval in st.session_state.nuevas_evaluaciones:
-                            # Formato consistente: nombre arriba, nombre abajo
                             col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
                             
                             with col1:
-                                # Tipo de evaluación (arriba)
                                 st.write(f"**📋 {nueva_eval['tipo']}**")
                                 st.write("Nombre:")
                             
                             with col2:
-                                # Nombre de la evaluación (arriba y abajo)
                                 st.write(f"**{nueva_eval['nombre']}**")
                                 calif_nueva = st.selectbox(
                                     "Calif:", 
@@ -746,12 +655,9 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 st.write(f"**{nueva_eval['nombre']}**")
                             
                             with col3:
-                                # Calificación
                                 st.write("Calificación:")
-                                # El selectbox ya está arriba
                             
                             with col4:
-                                # Mostrar calificación con color
                                 if calif_nueva == "EX":
                                     st.success("🌟")
                                 elif calif_nueva == "MB":
@@ -767,11 +673,10 @@ elif st.session_state.accion_actual == "evaluaciones":
                     
                     st.markdown("---")
             
-            # Botón de guardado masivo
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("💾 Guardar Todos los Cambios", type="primary", key="guardar_todos_evaluaciones"):
-                    # Aplicar todos los cambios
+                    cambios_guardados = 0
                     for key, cambios in st.session_state.evaluaciones_cambios.items():
                         idx = int(key.split("_")[0])
                         j = int(key.split("_")[1])
@@ -781,10 +686,10 @@ elif st.session_state.accion_actual == "evaluaciones":
                         
                         df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
                         df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
+                        cambios_guardados += 1
                         
-                        # Recalcular promedio final
                         calificaciones = []
-                        for i in range(1, 7):  # Ahora 6 evaluaciones
+                        for i in range(1, 7):
                             calif_col_temp = f"Calif {i}"
                             if pd.notna(df_evaluaciones.at[idx, calif_col_temp]):
                                 calificaciones.append(calificacion_a_numero(df_evaluaciones.at[idx, calif_col_temp]))
@@ -792,15 +697,13 @@ elif st.session_state.accion_actual == "evaluaciones":
                         promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
                         df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
                     
-                    # Guardar en Excel
-                    try:
-                        with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                            df_evaluaciones.to_excel(writer, sheet_name=trimestre_eval, index=False)
-                        st.success("✅ Todos los cambios de evaluaciones guardados!")
+                    if guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel):
+                        st.success(f"✅ {cambios_guardados} cambios guardados!")
+                        st.info(f"📁 Datos guardados en: {os.path.abspath(archivo_excel)}")
                         st.session_state.evaluaciones_cambios = {}
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Error guardando: {e}")
+                    else:
+                        st.error("❌ Error guardando cambios")
             
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_evaluaciones"):
@@ -808,13 +711,12 @@ elif st.session_state.accion_actual == "evaluaciones":
                     st.rerun()
             
             with col3:
-                # Estadísticas de evaluaciones
                 calificaciones_contadas = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
                 total_evaluaciones = 0
                 
                 for idx, row in df_evaluaciones.iterrows():
                     if pd.notna(row["Apellido y Nombre"]):
-                        for j in range(1, 7):  # 6 evaluaciones
+                        for j in range(1, 7):
                             calif_col = f"Calif {j}"
                             calif = row.get(calif_col)
                             if pd.notna(calif) and calif in calificaciones_contadas:
@@ -833,7 +735,6 @@ elif st.session_state.accion_actual == "reporte":
     st.header("📊 Reporte Individual Completo")
     st.markdown("---")
     
-    # Filtros visuales simplificados
     col1, col2, col3 = st.columns(3)
     with col1:
         curso_reporte = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="reporte_curso")
@@ -845,11 +746,9 @@ elif st.session_state.accion_actual == "reporte":
     
     st.markdown("---")
     
-    # Generar reporte individual automáticamente
     try:
         df_reporte = pd.read_excel(archivo_excel, sheet_name=trimestre_reporte)
         
-        # Aplicar filtros
         if curso_reporte != "Todos":
             df_reporte = df_reporte[df_reporte["Curso"] == curso_reporte]
         
@@ -859,13 +758,11 @@ elif st.session_state.accion_actual == "reporte":
         if not df_reporte.empty:
             for idx, row in df_reporte.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
-                    # Encabezado del reporte individual
                     st.write(f"# 📊 Reporte Individual: {row['Apellido y Nombre']}")
                     st.write(f"**📂 Curso:** {row['Curso']}")
                     st.write(f"**📅 Trimestre:** {trimestre_reporte}")
                     st.markdown("---")
                     
-                    # Sección de Asistencia
                     st.write("## 📋 Asistencia")
                     columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
                     presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
@@ -873,7 +770,6 @@ elif st.session_state.accion_actual == "reporte":
                     ausentes = totales - presentes
                     porcentaje = (presentes / totales * 100) if totales > 0 else 0
                     
-                    # Aplicar criterio exacto de nota de asistencia
                     if porcentaje >= 80:
                         nota_asistencia = "EX (10)"
                         color_asistencia = "🌟"
@@ -890,19 +786,16 @@ elif st.session_state.accion_actual == "reporte":
                     with col3: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
                     with col4: st.metric("📊 Nota Asistencia", f"{color_asistencia} {nota_asistencia}")
                     
-                    # Gráfico de asistencia usando Streamlit
                     st.markdown("---")
                     st.write("### 📈 Gráfico de Asistencia")
                     crear_grafico_asistencia(presentes, ausentes, row["Apellido y Nombre"])
                     
                     st.markdown("---")
-                    
-                    # Sección de Evaluaciones
                     st.write("## 📝 Evaluaciones")
                     evaluaciones_data = []
                     calificaciones = []
                     
-                    for i in range(1, 7):  # 6 evaluaciones
+                    for i in range(1, 7):
                         eval_col = f"Eval {i}"
                         calif_col = f"Calif {i}"
                         if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
@@ -917,14 +810,12 @@ elif st.session_state.accion_actual == "reporte":
                         df_eval_display = pd.DataFrame(evaluaciones_data)
                         st.dataframe(df_eval_display, use_container_width=True)
                         
-                        # Promedio final
                         promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
                         
                         col1, col2 = st.columns(2)
                         with col1:
                             st.metric("📊 Promedio Final Evaluaciones", f"{promedio_final:.1f}")
                         with col2:
-                            # Determinar calificación final
                             if promedio_final >= 9:
                                 calif_final = "EX"
                                 color_final = "🌟"
@@ -943,14 +834,11 @@ elif st.session_state.accion_actual == "reporte":
                             
                             st.metric("📊 Calificación Final", f"{color_final} {calif_final}")
                         
-                        # Gráfico de evaluaciones usando Streamlit
                         st.markdown("---")
                         st.write("### 📈 Gráfico de Evaluaciones")
                         crear_grafico_evaluaciones(evaluaciones_data, row["Apellido y Nombre"])
                     
                     st.markdown("---")
-                    
-                    # Resumen General
                     st.write("## 📈 Resumen General")
                     nota_asistencia_num = calcular_nota_asistencia(presentes, totales)
                     promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
@@ -961,7 +849,7 @@ elif st.session_state.accion_actual == "reporte":
                     with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_eval:.1f}")
                     with col3: st.metric("📊 Promedio General", f"{promedio_general:.1f}")
                     
-                    break  # Solo mostrar el primer alumno encontrado
+                    break
         else:
             st.info("📋 No hay datos para mostrar")
     except Exception as e:
@@ -972,7 +860,6 @@ elif st.session_state.accion_actual == "estadistica":
     st.header("📈 Análisis Estadístico Individual")
     st.markdown("---")
     
-    # Filtros visuales optimizados
     col1, col2, col3 = st.columns(3)
     with col1:
         curso_stats = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="stats_curso")
@@ -984,24 +871,21 @@ elif st.session_state.accion_actual == "estadistica":
     
     st.markdown("---")
     
-    # Botón de acción
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📈 Generar Estadísticas", type="primary", key="btn_generar_stats"):
             st.success("✅ Estadísticas generadas!")
     with col2:
-        st.write("")  # Espacio vacío
+        st.write("")
     with col3:
-        st.write("")  # Espacio vacío
+        st.write("")
     
     st.markdown("---")
     
-    # Estadísticas individuales detalladas
     st.subheader("📊 Estadísticas Individuales Detalladas")
     try:
         df_stats = pd.read_excel(archivo_excel, sheet_name=trimestre_stats)
         
-        # Aplicar filtros
         if curso_stats != "Todos":
             df_stats = df_stats[df_stats["Curso"] == curso_stats]
         
@@ -1011,12 +895,10 @@ elif st.session_state.accion_actual == "estadistica":
         if not df_stats.empty:
             for idx, row in df_stats.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
-                    # Encabezado individual
                     st.write(f"## 📊 Estadísticas de: {row['Apellido y Nombre']}")
                     st.write(f"**📂 Curso:** {row['Curso']} | **📅 Trimestre:** {trimestre_stats}")
                     st.markdown("---")
                     
-                    # Estadísticas de Asistencia
                     st.write("### 📋 Estadísticas de Asistencia")
                     columnas_asistencia = [col for col in df_stats.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
                     presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
@@ -1031,13 +913,11 @@ elif st.session_state.accion_actual == "estadistica":
                     with col4: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
                     
                     st.markdown("---")
-                    
-                    # Estadísticas de Evaluaciones (detalladas)
                     st.write("### 📝 Estadísticas de Evaluaciones Detalladas")
                     evaluaciones_detalle = []
                     calificaciones = []
                     
-                    for i in range(1, 7):  # 6 evaluaciones
+                    for i in range(1, 7):
                         eval_col = f"Eval {i}"
                         calif_col = f"Calif {i}"
                         if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
@@ -1053,7 +933,6 @@ elif st.session_state.accion_actual == "estadistica":
                         df_eval_detalle = pd.DataFrame(evaluaciones_detalle)
                         st.dataframe(df_eval_detalle, use_container_width=True)
                         
-                        # Estadísticas de las evaluaciones
                         if calificaciones:
                             promedio_final = sum(calificaciones) / len(calificaciones)
                             max_calificacion = max(calificaciones)
@@ -1067,14 +946,11 @@ elif st.session_state.accion_actual == "estadistica":
                             with col3: st.metric("📊 Calificación Más Baja", f"{min_calificacion:.1f}")
                             with col4: st.metric("📊 Total Evaluaciones", len(calificaciones))
                             
-                            # Gráfico de barras de evaluaciones usando Streamlit
                             st.markdown("---")
                             st.write("#### 📈 Gráfico de Desempeño por Evaluación")
                             crear_grafico_evaluaciones(evaluaciones_detalle, row["Apellido y Nombre"])
                     
                     st.markdown("---")
-                    
-                    # Resumen General Individual
                     st.write("### 📈 Resumen General Individual")
                     nota_asistencia_num = calcular_nota_asistencia(presentes, totales)
                     promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
@@ -1085,12 +961,11 @@ elif st.session_state.accion_actual == "estadistica":
                     with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_eval:.1f}")
                     with col3: st.metric("📊 Promedio General", f"{promedio_general:.1f}")
                     
-                    break  # Solo mostrar el primer alumno encontrado
+                    break
         else:
             st.info("📋 No hay datos para analizar")
     except Exception as e:
         st.error(f"Error: {e}")
         st.info("📊 Agrega datos simulados para probar")
 
-# Footer simplificado
 st.markdown("---")
