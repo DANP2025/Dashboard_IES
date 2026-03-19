@@ -937,40 +937,38 @@ elif st.session_state.accion_actual == "evaluaciones":
                             "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
                         }
                 
+                # Nuevas evaluaciones — DENTRO del loop de alumnos
+                if st.session_state.nuevas_evaluaciones:
+                    for ne in st.session_state.nuevas_evaluaciones:
+                        col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
+                        with col1:
+                            st.markdown(f"**#{ne['numero']}**")
+                            st.caption(ne['tipo'])
+                        with col2:
+                            st.markdown(f"**{ne['nombre']}**")
+                        with col3:
+                            opciones_ne = ["M", "R-", "R+", "B", "MB", "EX"]
+                            idx_ne = opciones_ne.index(ne['calificacion']) if ne['calificacion'] in opciones_ne else 3
+                            nueva_cal = st.selectbox(
+                                f"Cal nueva {ne['numero']}_{idx}",
+                                opciones_ne,
+                                index=idx_ne,
+                                key=f"nueva_eval_cal_{ne['numero']}_{idx}",
+                                label_visibility="collapsed"
+                            )
+                            # Guardar en session_state para poder guardar después
+                            st.session_state.evaluaciones_cambios[f"nueva_{idx}_{ne['numero']}"] = {
+                                "nombre": ne['nombre'],
+                                "calificacion": nueva_cal,
+                                "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
+                            }
+                        with col4:
+                            st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
+                        with col5:
+                            iconos_ne = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
+                            st.markdown(f"### {iconos_ne.get(nueva_cal, '❓')}")
+                
                 st.markdown("---")
-        
-        # Mostrar evaluaciones nuevas agregadas en esta sesión
-        if st.session_state.nuevas_evaluaciones:
-            st.markdown("#### ➕ Evaluaciones agregadas en esta sesión")
-            col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 3, 2, 2, 1])
-            with col_h1: st.caption("Nro.")
-            with col_h2: st.caption("Nombre de la evaluación")
-            with col_h3: st.caption("Calificación")
-            with col_h4: st.caption("Tipo")
-            with col_h5: st.caption("Estado")
-
-            for ne in st.session_state.nuevas_evaluaciones:
-                col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
-                with col1:
-                    st.markdown(f"**#{ne['numero']}**")
-                with col2:
-                    st.markdown(f"**{ne['nombre']}**")
-                with col3:
-                    opciones_ne = ["M", "R-", "R+", "B", "MB", "EX"]
-                    idx_ne = opciones_ne.index(ne['calificacion']) if ne['calificacion'] in opciones_ne else 3
-                    nueva_cal = st.selectbox(
-                        f"Cal nueva {ne['numero']}",
-                        opciones_ne,
-                        index=idx_ne,
-                        key=f"nueva_eval_cal_{ne['numero']}",
-                        label_visibility="collapsed"
-                    )
-                with col4:
-                    st.caption(ne['tipo'])
-                with col5:
-                    iconos_ne = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
-                    st.markdown(f"### {iconos_ne.get(ne['calificacion'], '❓')}")
-            st.markdown("---")
         
         col1, col2, col3 = st.columns(3)
         with col1:
