@@ -1491,26 +1491,66 @@ elif st.session_state.accion_actual == "reporte":
                             
                             st.markdown("---")
                             st.write("#### 📈 Gráfico de Desempeño")
-                            crear_grafico_evaluaciones(evaluaciones_data, row["Apellido y Nombre"])
+                            fig = crear_grafico_evaluaciones(evaluaciones_data, row["Apellido y Nombre"])
+                            if fig is not None:
+                                st.pyplot(fig)
+                            else:
+                                st.info("No hay datos suficientes para el gráfico")
                     
                     st.markdown("---")
-                    st.write("## 📈 Resumen General del Alumno")
+                    st.markdown("## 🏆 Calificación Promedio Final del Trimestre")
+
                     nota_asistencia_num = calcular_nota_asistencia(presentes, total_dias)
-                    promedio_eval_num = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                    promedio_general_num = (nota_asistencia_num + promedio_eval_num) / 2 if calificaciones else nota_asistencia_num
-                    
-                    st.write(f"**📊 Nota Final Asistencia:** {nota_asistencia_num}")
-                    st.write(f"**📊 Promedio Final Evaluaciones:** {promedio_eval_num}")
-                    st.write(f"**📈 Promedio General Final:** {promedio_general_num:.1f}")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("📊 Nota Final Asistencia", nota_asistencia_num)
-                    with col2:
-                        st.metric("📈 Promedio Final Evaluaciones", promedio_eval_num)
-                    
-                    st.markdown("---")
-                    st.metric("📈 Promedio General Final", promedio_general_num)
+                    promedio_eval_num = round(sum(calificaciones) / len(calificaciones), 1) if calificaciones else 0
+                    todas_califs = [nota_asistencia_num] + calificaciones
+                    promedio_final_trimestre = round(sum(todas_califs) / len(todas_califs), 1)
+
+                    if promedio_final_trimestre >= 9:
+                        alerta_borde = "#27ae60"
+                        alerta_color = "#1a7a4a"
+                        alerta_icono = "�"
+                    elif promedio_final_trimestre >= 8:
+                        alerta_borde = "#2980b9"
+                        alerta_color = "#1a4a7a"
+                        alerta_icono = "�"
+                    elif promedio_final_trimestre >= 7:
+                        alerta_borde = "#27ae60"
+                        alerta_color = "#1a5c3a"
+                        alerta_icono = "🟢"
+                    elif promedio_final_trimestre >= 6:
+                        alerta_borde = "#f39c12"
+                        alerta_color = "#7a5a00"
+                        alerta_icono = "🟡"
+                    else:
+                        alerta_borde = "#e74c3c"
+                        alerta_color = "#7a1a1a"
+                        alerta_icono = "🔴"
+
+                    st.markdown(f"""
+                    <div style='
+                        border-left: 5px solid {alerta_borde};
+                        background: linear-gradient(135deg, {alerta_color}22, {alerta_color}11);
+                        padding: 20px 24px;
+                        border-radius: 10px;
+                        margin: 10px 0;
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;
+                    '>
+                        <div style='font-size:48px;'>{alerta_icono}</div>
+                        <div>
+                            <div style='font-size:40px;font-weight:800;
+                            color:{alerta_borde};line-height:1;'>
+                                {promedio_final_trimestre}
+                            </div>
+                            <div style='font-size:11px;color:#7f8c8d;margin-top:6px;'>
+                                Asistencia ({nota_asistencia_num}) + 
+                                Evaluaciones ({promedio_eval_num}) — 
+                                {len(todas_califs)} items promediados
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     break
         else:
