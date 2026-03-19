@@ -350,87 +350,110 @@ def restaurar_desde_sheets_si_vacio():
 
 def agregar_datos_simulados_completos():
     archivo_excel = "sistema_educativo.xlsx"
-    if os.path.exists(archivo_excel):
-        try:
-            nombres_femeninos = [
-                "García López, Sofía María", "Rodríguez Martínez, Ana Isabel", "Fernández García, Laura Patricia",
-                "Sánchez Hernández, María José", "López Torres, Carmen Rosa", "Pérez Díaz, Beatriz Elena",
-                "Gómez Ruiz, Patricia Alejandra", "Martínez Castro, María Fernanda", "Romero Vargas, Ana Sofía",
-                "Alvarez Moreno, Isabel Cristina"
+    if not os.path.exists(archivo_excel):
+        return False
+    try:
+        # Nombres únicos por curso — sin repetición entre cursos
+        alumnos_por_curso = {
+            "EF 1A": [
+                "García López, Sofía", "Rodríguez Martínez, Ana", "Fernández García, Laura",
+                "Sánchez Hernández, María", "López Torres, Carmen",
+                "Pérez Díaz, Beatriz", "Gómez Ruiz, Patricia", "Martínez Castro, Fernanda",
+                "Romero Vargas, Sofía", "Alvarez Moreno, Isabel"
+            ],
+            "EF 2A": [
+                "Hernández González, Luciana", "Mendoza Silva, Valentina", "Castro Ramos, Isabella",
+                "Vargas Morales, Emilia", "Ortiz Ruiz, Camila",
+                "Torres Díaz, Florencia", "Ramírez Luna, Agustina", "Vega Castillo, Catalina",
+                "Ríos Herrera, Daniela", "Fuentes Mora, Valentina"
+            ],
+            "EF 1B": [
+                "Jiménez Ramos, Andrea", "Morales Vega, Gabriela", "Cruz Fuentes, Alejandra",
+                "Reyes Castillo, Natalia", "Herrera Torres, Verónica",
+                "Guzmán Pérez, Mariana", "Medina Ríos, Lucía", "Rojas Mendoza, Carolina",
+                "Soto Cruz, Paola", "Aguilar Jiménez, Valeria"
+            ],
+            "EF 2B": [
+                "Díaz Morales, Renata", "Muñoz Reyes, Antonella", "Guerrero Herrera, Micaela",
+                "Ruiz Guzmán, Julieta", "Flores Medina, Celeste",
+                "Núñez Rojas, Bianca", "Molina Soto, Camille", "Silva Aguilar, Abril",
+                "Castillo Díaz, Martina", "Moreno Muñoz, Azul"
+            ],
+            "TD 2A": [
+                "Perea Guerrero, Rocío", "Villanueva Ruiz, Pilar", "Ávila Flores, Rebeca",
+                "Espinoza Núñez, Ariana", "Contreras Molina, Sofía",
+                "Pacheco Silva, Génesis", "Lozano Castillo, Tamara", "Cárdenas Moreno, Almendra",
+                "Ibáñez Perea, Nicole", "Vidal Villanueva, Emma"
+            ],
+            "TD 2B": [
+                "Rangel Ávila, Sara", "Pedraza Espinoza, Regina", "Suárez Contreras, Miranda",
+                "Cisneros Pacheco, Jimena", "Montes Lozano, Aitana",
+                "Delgado Cárdenas, Daniela", "Esquivel Ibáñez, Paula", "Sandoval Vidal, Ivana",
+                "Domínguez Rangel, Carla", "Fuentes Pedraza, Lara"
             ]
-            
-            nombres_adicionales_ef1a = [
-                "Hernández González, Luciana Beatriz", "Mendoza Silva, Valentina Sofía", "Castro Ramos, Isabella Gabriela",
-                "Vargas Morales, Emilia Alejandra", "Ortiz Ruiz, Camila Victoria"
-            ]
-            
-            cursos = ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
-            
-            for trimestre_num in range(1, 4):
-                nombre_trimestre = f"{trimestre_num} Trimestre"
-                
-                df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
-                
-                for curso in cursos:
-                    if curso == "EF 1A":
-                        alumnos_curso = nombres_femeninos[:5] + nombres_adicionales_ef1a[:5]
-                    elif curso == "EF 2A":
-                        alumnos_curso = nombres_femeninos[:5]
-                    elif curso == "EF 1B":
-                        alumnos_curso = nombres_femeninos[5:] + nombres_adicionales_ef1a[:5]
-                    elif curso == "EF 2B":
-                        alumnos_curso = nombres_femeninos[:5] + nombres_adicionales_ef1a[3:]
-                    elif curso == "TD 2A":
-                        alumnos_curso = nombres_femeninos[3:8]
-                    elif curso == "TD 2B":
-                        alumnos_curso = nombres_femeninos[2:7]
-                    else:
-                        alumnos_curso = nombres_femeninos[:5]
-                    
-                    for alumno in alumnos_curso:
-                        if alumno not in df_trimestre["Apellido y Nombre"].values:
-                            nueva_fila = {
-                                "Apellido y Nombre": alumno,
-                                "Curso": curso,
-                                "Tipo Evaluación": "Diagnóstico"
-                            }
-                            
-                            for mes in range(1, 32):
-                                fecha_col = f"Mar-{mes:02d}"
-                                if fecha_col not in df_trimestre.columns:
-                                    df_trimestre[fecha_col] = "Ausente"
-                                nueva_fila[fecha_col] = "Ausente" if random.random() > 0.15 else "Presente"
-                            
-                            for mes in range(1, 31):
-                                fecha_col = f"Abr-{mes:02d}"
-                                if fecha_col not in df_trimestre.columns:
-                                    df_trimestre[fecha_col] = "Ausente"
-                                nueva_fila[fecha_col] = "Ausente" if random.random() > 0.15 else "Presente"
-                            
-                            for mes in range(1, 32):
-                                fecha_col = f"May-{mes:02d}"
-                                if fecha_col not in df_trimestre.columns:
-                                    df_trimestre[fecha_col] = "Ausente"
-                                nueva_fila[fecha_col] = "Ausente" if random.random() > 0.15 else "Presente"
-                            
-                            evaluaciones = [
-                                "Test de Velocidad", "Test de Resistencia", "Test de Flexibilidad",
-                                "Test de Fuerza", "Test de Coordinación", "Test de Agilidad"
-                            ]
-                            calificaciones = ["B", "MB", "EX", "R+", "R-", "M"]
-                            
-                            for i in range(1, 7):
-                                nueva_fila[f"Eval {i}"] = random.choice(evaluaciones)
-                                nueva_fila[f"Calif {i}"] = random.choice(calificaciones)
-                            
-                            df_trimestre = pd.concat([df_trimestre, pd.DataFrame([nueva_fila])], ignore_index=True)
-                
-                guardar_datos_excel(df_trimestre, nombre_trimestre, archivo_excel)
-            return True
-        except Exception as e:
-            st.error(f"Error generando datos simulados: {e}")
-            return False
-    return False
+        }
+
+        evaluaciones_nombres = [
+            "Test de Velocidad", "Test de Resistencia", "Test de Flexibilidad",
+            "Test de Fuerza", "Test de Coordinación", "Test de Agilidad"
+        ]
+        calificaciones_posibles = ["B", "MB", "EX", "R+", "R-", "M"]
+
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+
+            for curso, alumnos_lista in alumnos_por_curso.items():
+                for alumno in alumnos_lista:
+                    # Buscar si ya existe este alumno en este curso
+                    ya_existe = (
+                        not df_trimestre.empty and
+                        "Apellido y Nombre" in df_trimestre.columns and
+                        "Curso" in df_trimestre.columns and
+                        len(df_trimestre[
+                            (df_trimestre["Apellido y Nombre"] == alumno) &
+                            (df_trimestre["Curso"] == curso)
+                        ]) > 0
+                    )
+                    if ya_existe:
+                        continue
+
+                    nueva_fila = {
+                        "Apellido y Nombre": alumno,
+                        "Curso": curso,
+                        "Tipo Evaluación": "Diagnóstico"
+                    }
+
+                    for dia in range(1, 32):
+                        nueva_fila[f"Mar-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                    for dia in range(1, 31):
+                        nueva_fila[f"Abr-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                    for dia in range(1, 32):
+                        nueva_fila[f"May-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+
+                    califs_alumno = []
+                    for i in range(1, 7):
+                        nombre_eval = evaluaciones_nombres[i - 1]
+                        calif = random.choice(calificaciones_posibles)
+                        nueva_fila[f"Eval {i}"] = nombre_eval
+                        nueva_fila[f"Calif {i}"] = calif
+                        califs_alumno.append(calificacion_a_numero(calif))
+
+                    nueva_fila["Nota Final Evaluaciones"] = round(
+                        sum(califs_alumno) / len(califs_alumno), 1
+                    )
+
+                    df_trimestre = pd.concat(
+                        [df_trimestre, pd.DataFrame([nueva_fila])],
+                        ignore_index=True
+                    )
+
+            guardar_datos_excel(df_trimestre, nombre_trimestre, archivo_excel)
+
+        return True
+    except Exception as e:
+        st.error(f"Error generando datos simulados: {e}")
+        return False
 
 def agregar_nuevo_alumno(nombre, curso):
     archivo_excel = "sistema_educativo.xlsx"
