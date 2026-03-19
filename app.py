@@ -17,56 +17,6 @@ try:
 except Exception:
     GOOGLE_SHEETS_DISPONIBLE = False
 
-# Sidebar con ACCIONES
-st.sidebar.header("🎯 ACCIONES")
-
-# Agregar Alumno
-if st.sidebar.button("👤 Agregar Alumno", type="primary", key="btn_agregar_alumno"):
-    st.session_state.accion_actual = "agregar_alumno"
-
-# Asistencia
-if st.sidebar.button("📋 Asistencia", type="primary", key="btn_asistencia"):
-    st.session_state.accion_actual = "asistencia"
-
-# Evaluaciones
-if st.sidebar.button("📝 Evaluaciones", type="primary", key="btn_evaluaciones"):
-    st.session_state.accion_actual = "evaluaciones"
-
-# Reporte
-if st.sidebar.button("📊 Reporte", type="primary", key="btn_reporte"):
-    st.session_state.accion_actual = "reporte"
-
-# Estadística
-if st.sidebar.button("📈 Estadística", type="primary", key="btn_estadistica"):
-    st.session_state.accion_actual = "estadistica"
-
-st.sidebar.markdown("---")
-
-# Guardar y Backup
-if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backup_principal"):
-    try:
-        if generar_backup_detalles():
-            st.sidebar.success("✅ Backup Excel generado!")
-        else:
-            st.sidebar.error("❌ Error generando backup Excel")
-    except Exception as e:
-        st.sidebar.error(f"❌ Error Excel: {e}")
-
-    with st.sidebar:
-        with st.spinner("Sincronizando Google Sheets..."):
-            ok, mensaje = sincronizar_google_sheets()
-            if ok:
-                st.sidebar.success(f"✅ Google Sheets: {mensaje}")
-            else:
-                st.sidebar.error(f"❌ Google Sheets: {mensaje}")
-
-# Inicializar estado
-if 'accion_actual' not in st.session_state:
-    st.session_state.accion_actual = "dashboard"
-if 'nuevas_evaluaciones' not in st.session_state:
-    st.session_state.nuevas_evaluaciones = []
-
-# Funciones del sistema
 def sincronizar_google_sheets():
     """Sincroniza los datos locales con Google Sheets"""
     try:
@@ -194,6 +144,56 @@ def sincronizar_google_sheets():
     except Exception as e:
         return False, str(e)
 
+# Sidebar con ACCIONES
+st.sidebar.header("🎯 ACCIONES")
+
+# Agregar Alumno
+if st.sidebar.button("👤 Agregar Alumno", type="primary", key="btn_agregar_alumno"):
+    st.session_state.accion_actual = "agregar_alumno"
+
+# Asistencia
+if st.sidebar.button("📋 Asistencia", type="primary", key="btn_asistencia"):
+    st.session_state.accion_actual = "asistencia"
+
+# Evaluaciones
+if st.sidebar.button("📝 Evaluaciones", type="primary", key="btn_evaluaciones"):
+    st.session_state.accion_actual = "evaluaciones"
+
+# Reporte
+if st.sidebar.button("📊 Reporte", type="primary", key="btn_reporte"):
+    st.session_state.accion_actual = "reporte"
+
+# Estadística
+if st.sidebar.button("📈 Estadística", type="primary", key="btn_estadistica"):
+    st.session_state.accion_actual = "estadistica"
+
+st.sidebar.markdown("---")
+
+# Guardar y Backup
+if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backup_principal"):
+    try:
+        if generar_backup_detalles():
+            st.sidebar.success("✅ Backup Excel generado!")
+        else:
+            st.sidebar.error("❌ Error generando backup Excel")
+    except Exception as e:
+        st.sidebar.error(f"❌ Error Excel: {e}")
+
+    with st.sidebar:
+        with st.spinner("Sincronizando Google Sheets..."):
+            ok, mensaje = sincronizar_google_sheets()
+            if ok:
+                st.sidebar.success(f"✅ Google Sheets: {mensaje}")
+            else:
+                st.sidebar.error(f"❌ Google Sheets: {mensaje}")
+
+# Inicializar estado
+if 'accion_actual' not in st.session_state:
+    st.session_state.accion_actual = "dashboard"
+if 'nuevas_evaluaciones' not in st.session_state:
+    st.session_state.nuevas_evaluaciones = []
+
+# Funciones del sistema
 def crear_excel_si_no_existe():
     archivo_excel = "sistema_educativo.xlsx"
     if not os.path.exists(archivo_excel):
