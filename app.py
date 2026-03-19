@@ -6,6 +6,8 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 import random
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="Sistema Educativo", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
 
@@ -291,16 +293,16 @@ if st.session_state.accion_actual == "dashboard":
     st.dataframe(df_resumen, use_container_width=True)
     
     st.markdown("---")
-    st.subheader("👥 Todas las Alumnas por Curso - 3 Trimestres")
+    st.subheader("👥 Alumnas por Curso (5+ por curso) - 3 Trimestres")
     
-    # Mostrar tabla con todas las alumnas de todos los cursos para los 3 trimestres
+    # Mostrar tabla con 5+ alumnas por curso para los 3 trimestres
     try:
         for trimestre_num in range(1, 4):
             st.write(f"### 📅 {trimestre_num} Trimestre")
             df_todas = pd.read_excel(archivo_excel, sheet_name=f"{trimestre_num} Trimestre")
             
             if not df_todas.empty:
-                # Agrupar por curso y mostrar todas las alumnas
+                # Agrupar por curso y mostrar primeras 5 alumnas
                 cursos_unicos = df_todas["Curso"].unique()
                 
                 for curso in sorted(cursos_unicos):
@@ -308,7 +310,13 @@ if st.session_state.accion_actual == "dashboard":
                     alumnas_curso = df_todas[df_todas["Curso"] == curso][["Apellido y Nombre", "Curso", "Nota Asistencia", "Nota Final Evaluaciones"]]
                     
                     if not alumnas_curso.empty:
-                        st.dataframe(alumnas_curso, use_container_width=True)
+                        # Mostrar primeras 5 alumnas
+                        alumnas_mostradas = alumnas_curso.head(5)
+                        st.dataframe(alumnas_mostradas, use_container_width=True)
+                        
+                        # Si hay más de 5, mostrar indicador
+                        if len(alumnas_curso) > 5:
+                            st.caption(f"... y {len(alumnas_curso) - 5} alumnas más en este curso")
                     st.markdown("---")
             else:
                 st.info("📋 No hay alumnas registradas")
@@ -328,6 +336,7 @@ if st.session_state.accion_actual == "dashboard":
                 st.info("📝 6 evaluaciones por trimestre por alumna")
                 st.info("📅 Datos para los 3 trimestres")
                 st.info("🎯 EF 1A tiene 15 alumnas (5 adicionales)")
+                st.info("👀 Mostrando 5+ alumnas por curso")
                 st.rerun()
     with col2:
         if st.button("🔄 Actualizar Datos", type="secondary"):
@@ -510,7 +519,7 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.markdown("---")
     
     # Sistema para agregar más evaluaciones
-    st.subheader("📝 Sistema de Evaluaciones - Diseño en Línea")
+    st.subheader("📝 Sistema de Evaluaciones - Formato Consistente")
     
     # Opción para agregar nueva evaluación
     with st.expander("➕ Agregar Nueva Evaluación", expanded=False):
@@ -536,7 +545,7 @@ elif st.session_state.accion_actual == "evaluaciones":
     
     st.markdown("---")
     
-    # Tabla de evaluaciones con diseño en línea
+    # Tabla de evaluaciones con formato consistente
     try:
         df_evaluaciones = pd.read_excel(archivo_excel, sheet_name=trimestre_eval)
         
@@ -545,8 +554,8 @@ elif st.session_state.accion_actual == "evaluaciones":
             df_evaluaciones = df_evaluaciones[df_evaluaciones["Curso"] == curso_eval]
         
         if not df_evaluaciones.empty:
-            # Crear tabla visual con diseño en línea
-            st.write("📝 **Evaluaciones** - Tipo + Nombre + Calificación en la misma línea")
+            # Crear tabla visual con formato consistente
+            st.write("📝 **Evaluaciones** - Formato consistente (nombre arriba, nombre abajo)")
             
             # Inicializar estado para cambios
             if 'evaluaciones_cambios' not in st.session_state:
@@ -558,27 +567,30 @@ elif st.session_state.accion_actual == "evaluaciones":
                     # Encabezado de la alumna
                     st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
-                    # Mostrar evaluaciones existentes en línea (ahora 6)
+                    # Mostrar evaluaciones existentes con formato consistente
                     for j in range(1, 7):  # 6 evaluaciones base
                         eval_col = f"Eval {j}"
                         calif_col = f"Calif {j}"
                         
                         if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
+                            # Formato consistente: nombre arriba, nombre abajo
                             col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
                             
                             with col1:
-                                # Tipo de evaluación (usar el mismo para todas las evaluaciones de la alumna)
+                                # Tipo de evaluación (arriba)
                                 tipo_eval = row.get('Tipo Evaluación', 'Diagnóstico')
                                 st.write(f"**📋 {tipo_eval}**")
+                                st.write("Nombre:")
                             
                             with col2:
-                                # Nombre de la evaluación
+                                # Nombre de la evaluación (arriba y abajo)
                                 nombre_eval_actual = st.text_input(
-                                    "Nombre:", 
+                                    "", 
                                     value=row.get(eval_col, f"Evaluación {j}"),
                                     key=f"eval_nombre_{idx}_{j}",
                                     help="Nombre de la evaluación"
                                 )
+                                st.write(f"**{nombre_eval_actual}**")
                             
                             with col3:
                                 # Calificación
@@ -612,24 +624,32 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 "calificacion": calificacion
                             }
                     
-                    # Mostrar nuevas evaluaciones agregadas directamente (sin título)
+                    # Mostrar nuevas evaluaciones agregadas con formato consistente
                     if st.session_state.nuevas_evaluaciones:
                         for nueva_eval in st.session_state.nuevas_evaluaciones:
+                            # Formato consistente: nombre arriba, nombre abajo
                             col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
                             
                             with col1:
+                                # Tipo de evaluación (arriba)
                                 st.write(f"**📋 {nueva_eval['tipo']}**")
+                                st.write("Nombre:")
                             
                             with col2:
+                                # Nombre de la evaluación (arriba y abajo)
                                 st.write(f"**{nueva_eval['nombre']}**")
-                            
-                            with col3:
                                 calif_nueva = st.selectbox(
                                     "Calif:", 
                                     ["M", "R-", "R+", "B", "MB", "EX"],
                                     key=f"eval_nueva_{nueva_eval['numero']}_{idx}",
                                     help="Seleccionar calificación"
                                 )
+                                st.write(f"**{nueva_eval['nombre']}**")
+                            
+                            with col3:
+                                # Calificación
+                                st.write("Calificación:")
+                                # El selectbox ya está arriba
                             
                             with col4:
                                 # Mostrar calificación con color
@@ -711,10 +731,10 @@ elif st.session_state.accion_actual == "evaluaciones":
         st.info("📊 Agrega datos simulados para probar")
 
 elif st.session_state.accion_actual == "reporte":
-    st.header("📊 Generación de Reportes")
+    st.header("📊 Reporte Individual Completo")
     st.markdown("---")
     
-    # Filtros visuales
+    # Filtros visuales simplificados
     col1, col2, col3 = st.columns(3)
     with col1:
         curso_reporte = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="reporte_curso")
@@ -726,35 +746,7 @@ elif st.session_state.accion_actual == "reporte":
     
     st.markdown("---")
     
-    # Opciones de reporte simplificadas
-    st.subheader("⚙️ Opciones de Reporte")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        incluir_graficos = st.checkbox("📊 Incluir Gráficos", value=True, key="incluir_graficos_reporte")
-    with col2:
-        analisis_detallado = st.checkbox("🔬 Análisis Detallado", value=True, key="analisis_detallado_reporte")
-    with col3:
-        tipo_reporte = st.selectbox("📋 Tipo de Reporte:", ["Asistencia", "Evaluaciones", "General"], key="tipo_reporte")
-    
-    st.markdown("---")
-    
-    # Botones de acción
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("📊 Generar Reporte", type="primary", key="btn_generar_reporte"):
-            st.success("✅ Reporte generado exitosamente!")
-            st.info(f"📋 Reporte de {tipo_reporte} para {curso_reporte}")
-    with col2:
-        if st.button("👁️ Vista Previa", type="secondary", key="btn_vista_previa"):
-            st.info("📊 Generando vista previa del reporte...")
-    with col3:
-        if st.button("💾 Exportar Reporte", type="secondary", key="btn_exportar_reporte"):
-            st.success("✅ Reporte exportado!")
-    
-    st.markdown("---")
-    
-    # Vista previa del reporte SIN columna observaciones
-    st.subheader("📋 Vista Previa del Reporte")
+    # Generar reporte individual automáticamente
     try:
         df_reporte = pd.read_excel(archivo_excel, sheet_name=trimestre_reporte)
         
@@ -766,97 +758,134 @@ elif st.session_state.accion_actual == "reporte":
             df_reporte = df_reporte[df_reporte["Apellido y Nombre"] == alumno_reporte]
         
         if not df_reporte.empty:
-            if tipo_reporte == "Asistencia":
-                columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                display_data = []
-                for idx, row in df_reporte.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                        porcentaje = (presentes / totales * 100) if totales > 0 else 0
+            for idx, row in df_reporte.iterrows():
+                if pd.notna(row["Apellido y Nombre"]):
+                    # Encabezado del reporte individual
+                    st.write(f"# 📊 Reporte Individual: {row['Apellido y Nombre']}")
+                    st.write(f"**📂 Curso:** {row['Curso']}")
+                    st.write(f"**📅 Trimestre:** {trimestre_reporte}")
+                    st.markdown("---")
+                    
+                    # Sección de Asistencia
+                    st.write("## 📋 Asistencia")
+                    columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                    presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
+                    totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                    porcentaje = (presentes / totales * 100) if totales > 0 else 0
+                    
+                    # Aplicar criterio exacto de nota de asistencia
+                    if porcentaje >= 80:
+                        nota_asistencia = "EX (10)"
+                        color_asistencia = "🌟"
+                    elif porcentaje >= 51:
+                        nota_asistencia = "R+ (8)"
+                        color_asistencia = "⚠️"
+                    else:
+                        nota_asistencia = "M (5)"
+                        color_asistencia = "💔"
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1: st.metric("📊 Días Presentes", presentes)
+                    with col2: st.metric("📊 Total Días", totales)
+                    with col3: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
+                    with col4: st.metric("📊 Nota Asistencia", f"{color_asistencia} {nota_asistencia}")
+                    
+                    # Gráfico de asistencia
+                    st.markdown("---")
+                    st.write("### 📈 Gráfico de Asistencia")
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    asistencia_data = ['Presentes', 'Ausentes']
+                    asistencia_values = [presentes, totales - presentes]
+                    colors = ['#4CAF50', '#F44336']
+                    
+                    ax.pie(asistencia_values, labels=asistencia_data, autopct='%1.1f%%', colors=colors, startangle=90)
+                    ax.set_title(f'Distribución de Asistencia - {row["Apellido y Nombre"]}')
+                    st.pyplot(fig)
+                    
+                    st.markdown("---")
+                    
+                    # Sección de Evaluaciones
+                    st.write("## 📝 Evaluaciones")
+                    evaluaciones_data = []
+                    calificaciones = []
+                    
+                    for i in range(1, 7):  # 6 evaluaciones
+                        eval_col = f"Eval {i}"
+                        calif_col = f"Calif {i}"
+                        if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
+                            evaluaciones_data.append({
+                                "Evaluación": row[eval_col],
+                                "Calificación": row[calif_col],
+                                "Valor": calificacion_a_numero(row[calif_col])
+                            })
+                            calificaciones.append(calificacion_a_numero(row[calif_col]))
+                    
+                    if evaluaciones_data:
+                        df_eval_display = pd.DataFrame(evaluaciones_data)
+                        st.dataframe(df_eval_display, use_container_width=True)
                         
-                        # Aplicar criterio exacto de nota de asistencia
-                        if porcentaje >= 80:
-                            nota_asistencia = "EX (10)"
-                        elif porcentaje >= 51:
-                            nota_asistencia = "R+ (8)"
-                        else:
-                            nota_asistencia = "M (5)"
+                        # Promedio final
+                        promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
                         
-                        display_data.append({
-                            "Alumno": row["Apellido y Nombre"],
-                            "Curso": row["Curso"],
-                            "Días Presentes": presentes,
-                            "Total Días": totales,
-                            "% Asistencia": f"{porcentaje:.1f}%",
-                            "Nota Asistencia": nota_asistencia
-                        })
-            elif tipo_reporte == "Evaluaciones":
-                display_data = []
-                for idx, row in df_reporte.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        evaluaciones_info = []
-                        calificaciones = []
-                        notas_individuales = []
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("📊 Promedio Final Evaluaciones", f"{promedio_final:.1f}")
+                        with col2:
+                            # Determinar calificación final
+                            if promedio_final >= 9:
+                                calif_final = "EX"
+                                color_final = "🌟"
+                            elif promedio_final >= 8:
+                                calif_final = "MB"
+                                color_final = "✅"
+                            elif promedio_final >= 7:
+                                calif_final = "B"
+                                color_final = "✅"
+                            elif promedio_final >= 6:
+                                calif_final = "R+"
+                                color_final = "⚠️"
+                            else:
+                                calif_final = "M"
+                                color_final = "💔"
+                            
+                            st.metric("📊 Calificación Final", f"{color_final} {calif_final}")
                         
-                        for i in range(1, 7):  # 6 evaluaciones
-                            eval_col = f"Eval {i}"
-                            calif_col = f"Calif {i}"
-                            if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
-                                evaluaciones_info.append(f"{row[eval_col]}: {row[calif_col]}")
-                                calificaciones.append(calificacion_a_numero(row[calif_col]))
-                                notas_individuales.append(str(row[calif_col]))
+                        # Gráfico de evaluaciones
+                        st.markdown("---")
+                        st.write("### 📈 Gráfico de Evaluaciones")
+                        fig, ax = plt.subplots(figsize=(10, 6))
                         
-                        promedio = sum(calificaciones) / len(calificaciones) if calificaciones else 0
+                        eval_nombres = [eval_data["Evaluación"] for eval_data in evaluaciones_data]
+                        eval_valores = [eval_data["Valor"] for eval_data in evaluaciones_data]
                         
-                        display_data.append({
-                            "Alumno": row["Apellido y Nombre"],
-                            "Curso": row["Curso"],
-                            "Tipo Evaluación": row.get("Tipo Evaluación", ""),
-                            "Notas Individuales": ", ".join(notas_individuales),
-                            "Evaluaciones": " | ".join(evaluaciones_info),
-                            "Promedio Final": f"{promedio:.1f}"
-                        })
-            else:  # General
-                display_data = []
-                for idx, row in df_reporte.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        # Asistencia
-                        columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                        porcentaje = (presentes / totales * 100) if totales > 0 else 0
+                        bars = ax.bar(eval_nombres, eval_valores, color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'])
+                        ax.set_title(f'Rendimiento en Evaluaciones - {row["Apellido y Nombre"]}')
+                        ax.set_xlabel('Evaluaciones')
+                        ax.set_ylabel('Calificación Numérica')
+                        ax.set_ylim(0, 10)
                         
-                        # Aplicar criterio exacto de nota de asistencia
-                        if porcentaje >= 80:
-                            nota_asistencia = "EX (10)"
-                        elif porcentaje >= 51:
-                            nota_asistencia = "R+ (8)"
-                        else:
-                            nota_asistencia = "M (5)"
+                        # Añadir etiquetas de valor
+                        for bar, valor in zip(bars, eval_valores):
+                            height = bar.get_height()
+                            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                                    f'{valor}', ha='center', va='bottom')
                         
-                        # Evaluaciones
-                        calificaciones = []
-                        notas_individuales = []
-                        for i in range(1, 7):  # 6 evaluaciones
-                            calif_col = f"Calif {i}"
-                            if pd.notna(row[calif_col]):
-                                calificaciones.append(calificacion_a_numero(row[calif_col]))
-                                notas_individuales.append(str(row[calif_col]))
-                        promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                        
-                        display_data.append({
-                            "Alumno": row["Apellido y Nombre"],
-                            "Curso": row["Curso"],
-                            "% Asistencia": f"{porcentaje:.1f}%",
-                            "Nota Asistencia": nota_asistencia,
-                            "Notas Evaluaciones": ", ".join(notas_individuales),
-                            "Promedio Final": f"{promedio_eval:.1f}"
-                        })
-            
-            if display_data:
-                df_display = pd.DataFrame(display_data)
-                st.dataframe(df_display, use_container_width=True)
+                        plt.xticks(rotation=45, ha='right')
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                    
+                    st.markdown("---")
+                    
+                    # Resumen General
+                    st.write("## 📈 Resumen General")
+                    promedio_general = (nota_asistencia.split('(')[1].replace(')', '').strip() + f" {promedio_final:.1f}") if '(' in nota_asistencia else f"{promedio_final:.1f}"
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1: st.metric("📊 Nota Asistencia", nota_asistencia)
+                    with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_final:.1f}")
+                    with col3: st.metric("📊 Promedio General", f"{((calificacion_a_numero(nota_asistencia.split('(')[1].replace(')', '').strip()) + promedio_final) / 2):.1f}" if '(' in nota_asistencia else f"{promedio_final:.1f}")
+                    
+                    break  # Solo mostrar el primer alumno encontrado
         else:
             st.info("📋 No hay datos para mostrar")
     except Exception as e:
@@ -864,7 +893,7 @@ elif st.session_state.accion_actual == "reporte":
         st.info("📊 Agrega datos simulados para probar")
 
 elif st.session_state.accion_actual == "estadistica":
-    st.header("📈 Análisis Estadístico")
+    st.header("📈 Análisis Estadístico Individual")
     st.markdown("---")
     
     # Filtros visuales optimizados
@@ -879,33 +908,20 @@ elif st.session_state.accion_actual == "estadistica":
     
     st.markdown("---")
     
-    # Opciones de análisis simplificadas
-    st.subheader("⚙️ Opciones de Análisis")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        mostrar_graficos = st.checkbox("📊 Mostrar Gráficos", value=True, key="mostrar_graficos_stats")
-        analisis_detallado = st.checkbox("🔬 Análisis Detallado", value=True, key="analisis_detallado_stats")
-    with col2:
-        tipo_analisis = st.selectbox("📋 Tipo de Análisis:", ["Asistencia", "Evaluaciones", "Desempeño General"], key="tipo_analisis_stats")
-    with col3:
-        st.write("")  # Espacio
-    
-    st.markdown("---")
-    
-    # Botón de acción (solo generar estadísticas)
+    # Botón de acción
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📈 Generar Estadísticas", type="primary", key="btn_generar_stats"):
             st.success("✅ Estadísticas generadas!")
     with col2:
-        st.write("")  # Espacio vacío (sin botón actualizar)
+        st.write("")  # Espacio vacío
     with col3:
-        st.write("")  # Espacio vacío (sin botón exportar)
+        st.write("")  # Espacio vacío
     
     st.markdown("---")
     
-    # Estadísticas generales con todas las calificaciones del trimestre
-    st.subheader("📊 Estadísticas Generales - Todas las Calificaciones del Trimestre")
+    # Estadísticas individuales detalladas
+    st.subheader("📊 Estadísticas Individuales Detalladas")
     try:
         df_stats = pd.read_excel(archivo_excel, sheet_name=trimestre_stats)
         
@@ -917,140 +933,102 @@ elif st.session_state.accion_actual == "estadistica":
             df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
         
         if not df_stats.empty:
-            # Métricas principales
-            col1, col2, col3, col4 = st.columns(4)
-            
-            if tipo_analisis == "Asistencia":
-                columnas_asistencia = [col for col in df_stats.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                total_presentes = 0
-                total_ausentes = 0
-                total_dias = 0
-                
-                for idx, row in df_stats.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        for col in columnas_asistencia:
-                            if pd.notna(row[col]):
-                                total_dias += 1
-                                if row[col] == "Presente":
-                                    total_presentes += 1
-                                else:
-                                    total_ausentes += 1
-                
-                porcentaje_general = (total_presentes / total_dias * 100) if total_dias > 0 else 0
-                
-                with col1: st.metric("👥 Total Alumnos", len(df_stats))
-                with col2: st.metric("📊 % Asistencia General", f"{porcentaje_general:.1f}%")
-                with col3: st.metric("✅ Total Presentes", total_presentes)
-                with col4: st.metric("❌ Total Ausentes", total_ausentes)
-                
-                # Gráfico de distribución
-                if mostrar_graficos:
+            for idx, row in df_stats.iterrows():
+                if pd.notna(row["Apellido y Nombre"]):
+                    # Encabezado individual
+                    st.write(f"## 📊 Estadísticas de: {row['Apellido y Nombre']}")
+                    st.write(f"**📂 Curso:** {row['Curso']} | **📅 Trimestre:** {trimestre_stats}")
                     st.markdown("---")
-                    st.subheader("📈 Distribución de Asistencia")
-                    asistencia_data = {
-                        "Presentes": total_presentes,
-                        "Ausentes": total_ausentes
-                    }
-                    df_asistencia_grafico = pd.DataFrame(list(asistencia_data.items()), columns=["Estado", "Cantidad"])
-                    st.bar_chart(df_asistencia_grafico, x="Estado", y="Cantidad")
-            
-            elif tipo_analisis == "Evaluaciones":
-                # Contar todas las calificaciones del trimestre
-                conteo_calificaciones = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
-                todas_las_calificaciones = []
-                
-                for idx, row in df_stats.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        for i in range(1, 7):  # 6 evaluaciones por trimestre
-                            calif_col = f"Calif {i}"
-                            if pd.notna(row[calif_col]):
-                                calif = str(row[calif_col]).upper().strip()
-                                if calif in conteo_calificaciones:
-                                    conteo_calificaciones[calif] += 1
-                                    todas_las_calificaciones.append({
-                                        "Alumno": row["Apellido y Nombre"],
-                                        "Curso": row["Curso"],
-                                        "Evaluación": f"Eval {i}",
-                                        "Calificación": calif,
-                                        "Nombre Evaluación": row.get(f"Eval {i}", f"Evaluación {i}")
-                                    })
-                
-                total_evaluaciones = sum(conteo_calificaciones.values())
-                
-                with col1: st.metric("👥 Total Alumnos", len(df_stats))
-                with col2: st.metric("📝 Total Evaluaciones", total_evaluaciones)
-                with col3: st.metric("📊 Calificación Más Frecuente", max(conteo_calificaciones, key=conteo_calificaciones.get))
-                with col4: st.metric("📈 Promedio General", "7.6")
-                
-                # Gráfico de calificaciones
-                if mostrar_graficos:
+                    
+                    # Estadísticas de Asistencia
+                    st.write("### 📋 Estadísticas de Asistencia")
+                    columnas_asistencia = [col for col in df_stats.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                    presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
+                    totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                    ausentes = totales - presentes
+                    porcentaje = (presentes / totales * 100) if totales > 0 else 0
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1: st.metric("📊 Días Presentes", presentes)
+                    with col2: st.metric("📊 Días Ausentes", ausentes)
+                    with col3: st.metric("📊 Total Días", totales)
+                    with col4: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
+                    
                     st.markdown("---")
-                    st.subheader("📈 Distribución de Calificaciones del Trimestre")
-                    if total_evaluaciones > 0:
-                        calif_df = pd.DataFrame(list(conteo_calificaciones.items()), columns=["Calificación", "Cantidad"])
-                        st.bar_chart(calif_df, x="Calificación", y="Cantidad")
-                
-                # Tabla con todas las calificaciones del trimestre
-                if analisis_detallado:
-                    st.markdown("---")
-                    st.subheader("📋 Todas las Calificaciones del Trimestre")
-                    if todas_las_calificaciones:
-                        df_todas_califs = pd.DataFrame(todas_las_calificaciones)
-                        st.dataframe(df_todas_califs, use_container_width=True)
-                    else:
-                        st.info("📋 No hay calificaciones registradas")
-            
-            else:  # Desempeño General
-                with col1: st.metric("👥 Total Alumnos", len(df_stats))
-                with col2: st.metric("📊 Promedio Asistencia", "82%")
-                with col3: st.metric("📝 Promedio Evaluaciones", "7.6")
-                with col4: st.metric("📈 Desempeño General", "7.8")
-                
-                # Gráfico combinado
-                if mostrar_graficos:
-                    st.markdown("---")
-                    st.subheader("📈 Desempeño General")
-                    desempeno_data = {
-                        "Asistencia": 82,
-                        "Evaluaciones": 76,
-                        "Desempeño": 78
-                    }
-                    df_desempeno_grafico = pd.DataFrame(list(desempeno_data.items()), columns=["Métrica", "Valor"])
-                    st.bar_chart(df_desempeno_grafico, x="Métrica", y="Valor")
-            
-            # Tabla detallada
-            if analisis_detallado:
-                st.markdown("---")
-                st.subheader("📋 Análisis Detallado por Alumna")
-                
-                display_stats = []
-                for idx, row in df_stats.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        columnas_asistencia = [col for col in df_stats.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                        porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
-                        nota_asistencia = calcular_nota_asistencia(presentes, totales)
+                    
+                    # Estadísticas de Evaluaciones (detalladas)
+                    st.write("### 📝 Estadísticas de Evaluaciones Detalladas")
+                    evaluaciones_detalle = []
+                    calificaciones = []
+                    
+                    for i in range(1, 7):  # 6 evaluaciones
+                        eval_col = f"Eval {i}"
+                        calif_col = f"Calif {i}"
+                        if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
+                            calif_num = calificacion_a_numero(row[calif_col])
+                            evaluaciones_detalle.append({
+                                "Evaluación": row[eval_col],
+                                "Calificación": row[calif_col],
+                                "Valor Numérico": calif_num
+                            })
+                            calificaciones.append(calif_num)
+                    
+                    if evaluaciones_detalle:
+                        df_eval_detalle = pd.DataFrame(evaluaciones_detalle)
+                        st.dataframe(df_eval_detalle, use_container_width=True)
                         
-                        calificaciones = []
-                        for i in range(1, 7):  # 6 evaluaciones
-                            calif_col = f"Calif {i}"
-                            if pd.notna(row[calif_col]):
-                                calificaciones.append(calificacion_a_numero(row[calif_col]))
-                        promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                        
-                        display_stats.append({
-                            "Alumno": row["Apellido y Nombre"],
-                            "Curso": row["Curso"],
-                            "% Asistencia": f"{porcentaje_asistencia:.1f}%",
-                            "Nota Asistencia": nota_asistencia,
-                            "Promedio Evaluaciones": f"{promedio_eval:.1f}",
-                            "Promedio Final": row.get("Nota Final Evaluaciones", 0)
-                        })
-                
-                if display_stats:
-                    df_display_stats = pd.DataFrame(display_stats)
-                    st.dataframe(df_display_stats, use_container_width=True)
+                        # Estadísticas de las evaluaciones
+                        if calificaciones:
+                            promedio_final = sum(calificaciones) / len(calificaciones)
+                            max_calificacion = max(calificaciones)
+                            min_calificacion = min(calificaciones)
+                            
+                            st.markdown("---")
+                            st.write("#### 📈 Resumen Numérico de Evaluaciones")
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1: st.metric("📊 Promedio Final", f"{promedio_final:.1f}")
+                            with col2: st.metric("📊 Calificación Más Alta", f"{max_calification:.1f}")
+                            with col3: st.metric("📊 Calificación Más Baja", f"{min_calification:.1f}")
+                            with col4: st.metric("📊 Total Evaluaciones", len(calificaciones))
+                            
+                            # Gráfico de barras de evaluaciones
+                            st.markdown("---")
+                            st.write("#### 📈 Gráfico de Desempeño por Evaluación")
+                            fig, ax = plt.subplots(figsize=(12, 6))
+                            
+                            eval_nombres = [eval_data["Evaluación"] for eval_data in evaluaciones_detalle]
+                            eval_valores = [eval_data["Valor Numérico"] for eval_data in evaluaciones_detalle]
+                            
+                            bars = ax.bar(eval_nombres, eval_valores, color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'])
+                            ax.set_title(f'Desempeño Detallado - {row["Apellido y Nombre"]}')
+                            ax.set_xlabel('Evaluaciones')
+                            ax.set_ylabel('Calificación Numérica')
+                            ax.set_ylim(0, 10)
+                            
+                            # Añadir etiquetas de valor
+                            for bar, valor in zip(bars, eval_valores):
+                                height = bar.get_height()
+                                ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                                        f'{valor}', ha='center', va='bottom')
+                            
+                            plt.xticks(rotation=45, ha='right')
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                    
+                    st.markdown("---")
+                    
+                    # Resumen General Individual
+                    st.write("### 📈 Resumen General Individual")
+                    nota_asistencia_num = calcular_nota_asistencia(presentes, totales)
+                    promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
+                    promedio_general = (nota_asistencia_num + promedio_eval) / 2 if calificaciones else nota_asistencia_num
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1: st.metric("📊 Nota Asistencia", f"{nota_asistencia_num:.1f}")
+                    with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_eval:.1f}")
+                    with col3: st.metric("📊 Promedio General", f"{promedio_general:.1f}")
+                    
+                    break  # Solo mostrar el primer alumno encontrado
         else:
             st.info("📋 No hay datos para analizar")
     except Exception as e:
@@ -1065,7 +1043,7 @@ st.markdown("""
         <span style='color: #4CAF50;'>✅</span> Sistema optimizado para educación física<br>
         <span style='color: #4CAF50;'>👥</span> 65 alumnas simuladas<br>
         <span style='color: #4CAF50;'>📝</span> 6 evaluaciones por trimestre<br>
-        <span style='color: #4CAF50;'>📊</span> Estadísticas completas
+        <span style='color: #4CAF50;'>📊</span> Estadísticas individuales detalladas
     </p>
     <small style='color: rgba(255,255,255,0.8);'>Plataforma educativa profesional</small>
 </div>
