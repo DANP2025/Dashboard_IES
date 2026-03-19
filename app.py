@@ -2011,8 +2011,12 @@ elif st.session_state.accion_actual == "historial":
         client = gspread.authorize(creds)
         SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
         spreadsheet = client.open_by_key(SPREADSHEET_ID)
-        ws = spreadsheet.worksheet("Historial de Cambios")
-        data = ws.get_all_records()
+        try:
+            ws = spreadsheet.worksheet("Historial de Cambios")
+            data = ws.get_all_records()
+        except Exception:
+            st.info("📋 No hay cambios registrados aún. El historial se creará automáticamente cuando guardes asistencia o evaluaciones.")
+            data = []
         if data:
             df_hist = pd.DataFrame(data)
             # Filtros
