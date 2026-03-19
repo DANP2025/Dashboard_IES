@@ -140,16 +140,16 @@ with tab1:
     with col1:
         año_actual = date.today().year
         años_disponibles = list(range(año_actual - 5, año_actual + 1))
-        año_seleccionado = st.selectbox("Seleccionar Año:", años_disponibles, index=len(años_disponibles)-1)
+        año_seleccionado = st.selectbox("Seleccionar Año:", años_disponibles, key="dashboard_año")
     
     with col2:
         meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-        mes_seleccionado = st.selectbox("Seleccionar Mes:", meses)
+        mes_seleccionado = st.selectbox("Seleccionar Mes:", meses, key="dashboard_mes")
     
     with col3:
-        cursos = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-        curso_seleccionado = st.selectbox("Seleccionar Curso:", cursos)
+        cursos_dashboard = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
+        curso_seleccionado = st.selectbox("Seleccionar Curso:", cursos_dashboard, key="dashboard_curso")
     
     # Gráfico de asistencia
     st.markdown("---")
@@ -187,18 +187,20 @@ with tab2:
         col1, col2 = st.columns(2)
         
         with col1:
-            nombre = st.text_input("Nombre Completo:")
-            dni = st.text_input("DNI:")
-            email = st.text_input("Email:")
-            telefono = st.text_input("Teléfono:")
+            nombre = st.text_input("Nombre Completo:", key="alumno_nombre")
+            dni = st.text_input("DNI:", key="alumno_dni")
+            email = st.text_input("Email:", key="alumno_email")
+            telefono = st.text_input("Teléfono:", key="alumno_telefono")
         
         with col2:
-            fecha_nacimiento = st.date_input("Fecha de Nacimiento:")
-            curso = st.selectbox("Curso:", ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"])
-            direccion = st.text_area("Dirección:")
-            estado = st.selectbox("Estado:", ["Activo", "Inactivo", "Egresado"])
+            fecha_nacimiento = st.date_input("Fecha de Nacimiento:", key="alumno_nacimiento")
+            cursos_alumno = ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
+            curso = st.selectbox("Curso:", cursos_alumno, key="alumno_curso")
+            direccion = st.text_area("Dirección:", key="alumno_direccion")
+            estados_alumno = ["Activo", "Inactivo", "Egresado"]
+            estado = st.selectbox("Estado:", estados_alumno, key="alumno_estado")
         
-        if st.button("💾 Guardar Alumno", type="primary"):
+        if st.button("💾 Guardar Alumno", type="primary", key="guardar_alumno"):
             st.success("✅ Alumno guardado exitosamente!")
             st.balloons()
     
@@ -210,13 +212,15 @@ with tab2:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        filtro_nombre = st.text_input("Buscar por Nombre:")
+        filtro_nombre = st.text_input("Buscar por Nombre:", key="filtro_nombre")
     
     with col2:
-        filtro_curso = st.selectbox("Filtrar por Curso:", ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"])
+        cursos_filtro = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
+        filtro_curso = st.selectbox("Filtrar por Curso:", cursos_filtro, key="filtro_curso")
     
     with col3:
-        filtro_estado = st.selectbox("Filtrar por Estado:", ["Todos", "Activo", "Inactivo", "Egresado"])
+        estados_filtro = ["Todos", "Activo", "Inactivo", "Egresado"]
+        filtro_estado = st.selectbox("Filtrar por Estado:", estados_filtro, key="filtro_estado")
     
     # Tabla de alumnos (datos de ejemplo)
     st.markdown("---")
@@ -243,8 +247,9 @@ with tab3:
     col1, col2 = st.columns(2)
     
     with col1:
-        fecha_asistencia = st.date_input("Fecha de Asistencia:", value=datetime.now().date())
-        curso_asistencia = st.selectbox("Curso:", ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"])
+        fecha_asistencia = st.date_input("Fecha de Asistencia:", value=datetime.now().date(), key="asistencia_fecha")
+        cursos_asistencia = ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
+        curso_asistencia = st.selectbox("Curso:", cursos_asistencia, key="asistencia_curso")
     
     with col2:
         st.write("📊 Estadísticas del día:")
@@ -269,7 +274,7 @@ with tab3:
     df_asistencia_registro = pd.DataFrame(datos_asistencia_registro)
     st.dataframe(df_asistencia_registro, use_container_width=True)
     
-    if st.button("💾 Guardar Asistencia", type="primary"):
+    if st.button("💾 Guardar Asistencia", type="primary", key="guardar_asistencia"):
         st.success("✅ Asistencia guardada exitosamente!")
         st.info("📊 Los datos han sido respaldados en Google Drive")
         st.balloons()
@@ -283,17 +288,20 @@ with tab4:
         col1, col2 = st.columns(2)
         
         with col1:
-            titulo_eval = st.text_input("Título de Evaluación:")
-            curso_eval = st.selectbox("Curso:", ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"])
-            tipo_eval = st.selectbox("Tipo:", ["Parcial", "Final", "Trabajo Práctico", "Proyecto"])
-            fecha_eval = st.date_input("Fecha de Evaluación:")
+            titulo_eval = st.text_input("Título de Evaluación:", key="evaluacion_titulo")
+            cursos_eval = ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
+            curso_eval = st.selectbox("Curso:", cursos_eval, key="evaluacion_curso")
+            tipos_eval = ["Parcial", "Final", "Trabajo Práctico", "Proyecto"]
+            tipo_eval = st.selectbox("Tipo:", tipos_eval, key="evaluacion_tipo")
+            fecha_eval = st.date_input("Fecha de Evaluación:", key="evaluacion_fecha")
         
         with col2:
-            descripcion_eval = st.text_area("Descripción:")
-            ponderacion_eval = st.number_input("Ponderación (%)", min_value=0, max_value=100, value=100)
-            estado_eval = st.selectbox("Estado:", ["Pendiente", "En Curso", "Finalizada"])
+            descripcion_eval = st.text_area("Descripción:", key="evaluacion_descripcion")
+            ponderacion_eval = st.number_input("Ponderación (%)", min_value=0, max_value=100, value=100, key="evaluacion_ponderacion")
+            estados_eval = ["Pendiente", "En Curso", "Finalizada"]
+            estado_eval = st.selectbox("Estado:", estados_eval, key="evaluacion_estado")
         
-        if st.button("📝 Crear Evaluación", type="primary"):
+        if st.button("📝 Crear Evaluación", type="primary", key="crear_evaluacion"):
             st.success("✅ Evaluación creada exitosamente!")
             st.info("📊 La evaluación ha sido agregada al sistema")
             st.balloons()
@@ -319,13 +327,16 @@ with tab4:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        filtro_curso_eval = st.selectbox("Filtrar por Curso:", ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"])
+        cursos_filtro_eval = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
+        filtro_curso_eval = st.selectbox("Filtrar por Curso:", cursos_filtro_eval, key="filtro_eval_curso")
     
     with col2:
-        filtro_tipo_eval = st.selectbox("Filtrar por Tipo:", ["Todos", "Parcial", "Final", "Trabajo Práctico", "Proyecto"])
+        tipos_filtro_eval = ["Todos", "Parcial", "Final", "Trabajo Práctico", "Proyecto"]
+        filtro_tipo_eval = st.selectbox("Filtrar por Tipo:", tipos_filtro_eval, key="filtro_eval_tipo")
     
     with col3:
-        filtro_estado_eval = st.selectbox("Filtrar por Estado:", ["Todos", "Pendiente", "En Curso", "Finalizada"])
+        estados_filtro_eval = ["Todos", "Pendiente", "En Curso", "Finalizada"]
+        filtro_estado_eval = st.selectbox("Filtrar por Estado:", estados_filtro_eval, key="filtro_eval_estado")
 
 # ==================== TAB 5: CONFIGURACIÓN ====================
 with tab5:
@@ -338,11 +349,11 @@ with tab5:
     with st.form("credentials_form"):
         st.write("Ingresa tus credenciales de Google Cloud:")
         
-        project_id = st.text_input("Project ID", value="turnkey-realm-490621-g6", help="Tu ID de proyecto de Google Cloud")
-        private_key_id = st.text_input("Private Key ID", value="23197905dd3b00c010c0c95176ee2d7ef31690f6", help="ID de tu clave privada")
-        client_email = st.text_input("Client Email", value="dashboard-backup@turnkey-realm-490621-g6.iam.gserviceaccount.com", help="Email de tu cuenta de servicio")
-        client_id = st.text_input("Client ID", value="112970843523581797879", help="ID de tu cliente")
-        private_key = st.text_area("Private Key", value="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDQmT9B3VOTdpL9\napPEOSFvFzLiv8vA7IP/5WmAV1KBTZ/5VOPKtrMHKDTedsBQpGbr68Nr5uPR03s7\n3T8PbEumSiV9Npj6Nqjb4hNq9sIq7mBaDJlcmYnBjpaqUo1zTVICOkUi9nXIk3wN\nqGmFsSxmlg/iNGH92Hwyqq0IRgT13HmlGLLpOv6uy3DaUXdg3Xl7jq/gbjLDTk4e\nUc+0TEA3Qd1djkHUYjqaxNcK+/Ie1GyF8hy6hB9YIkciiShBA8KKFi/Q8mxwIH5D\nfadiFqAwMIzdoPAHMwmQH/qw2PkK1Brk8y2cDIr8peoQPI+UyunbZERdLf+TmbYm\n3RgoTYqHAgMBAAECggEALyh2BI3ktxG3aVMO1O2VgWfdOSXjClpt/QwALeOP42uJ\nHvTyCoIDNzr/uMtf7ts76VoDdAFev7DvyzjZaMMy1wUsNIKDUw3IXu1dNnFStCHv\n5muywBx16Cw0I41GLSrtv1MtDhppxk6RXQUV1gOX5hlGvfzZqmmmqk2rkJNDy9ED\nqBLVt9DCu/MH6TFRrFQAsXSN7BvotXfs2TorSWpxQEyYAHUIHd7l3kMsDFog0nnt\noxGXukJtjOpk7cKjLJN/s+GKUUQRjT5fXKNmFzAJssfqIp8MerRyOVJvQl63rhyG\n1e0iqPEIxCxSE5uW6cNnfwRXUQelIPbZfsOZBmI1AQKBgQDtvdEvXkG7bHx5+3w6\nOsjAPDAwv7RyTQ+vC03hZVAOByUsQUCe/LHAecrYrLyEG7dEv2ILvGt2D02QXCEk\nt8LVA+Dk8pPDZS1fUSYfYFyWX0eTaL1ywjoBNPSuwauo5FmT3W4OAmUovluM0fpk\nkttGdmk1Nr5BAHDYgST8dIWRQwKBgQDgnnVxqmDAjSEBcOtxt2ZUhcZ0nGiqmRE+\nBISuqUmyR18svPn/Z+ERrULM4/JYyJh0IUEW3q5d0qVoZYPrf3ZZNx6nbvwxUFeI\no8e53NoXlxo8uvNDUjoNpbt1mK4+ycrkJz56cymQ3+4yHfQGbDGwn2KfF4aVgqRD\nAqjEuNb7bQKBgGr+7cFKw3yNg6wGgc9XG3hg3jNiY9y5T+CwzrktNo1Jq/Ix39pt\n0bXVWnSPsTwnmSConYC4qH2NKtOu1/iEB58Y1/GyLe8tmHajLS8Uo8ejIEMN48J\nWL+oTKLF6PLW6nXAx0Io08w1d9B1xCI1cdhRfGIFpDRu9VqLLNEtw9svAoGBALak\nAikneb53wvOyBrATiXCGyiS9nVnCVsPP1rdSzarZ3+i3zKvBor/F20BQxRkuGtCq\nzYs0DCIcCwVFLixKG0hVymYol4Xdpx9i1R8rFmcCJYJmHTGLZcr9DN2FBYHmgURd\nKK9WfuDfRIaZ1nd2eDz+jKmB7pwZe0lFm0dCaQRNAoGAGNqYxXyY64TmQjL6z6WR\nREfFhx3z5bjtc5Z2/JIT7QLCCZJzd/ObKW0xdJ+h3uvUemYFMJt3V4aBVhtlzGxr\nUQ0eaOw+61wDYTc7pwHp6XpBs5G56DmSzmPTPtDM0TWoBK/qXVYxjq8N4uwofun\nYKi8CaOnXQDNl/T1wj34RSo=\n-----END PRIVATE KEY-----", height=200, help="Tu clave privada completa")
+        project_id = st.text_input("Project ID", value="turnkey-realm-490621-g6", help="Tu ID de proyecto de Google Cloud", key="project_id")
+        private_key_id = st.text_input("Private Key ID", value="23197905dd3b00c010c0c95176ee2d7ef31690f6", help="ID de tu clave privada", key="private_key_id")
+        client_email = st.text_input("Client Email", value="dashboard-backup@turnkey-realm-490621-g6.iam.gserviceaccount.com", help="Email de tu cuenta de servicio", key="client_email")
+        client_id = st.text_input("Client ID", value="112970843523581797879", help="ID de tu cliente", key="client_id")
+        private_key = st.text_area("Private Key", value="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDQmT9B3VOTdpL9\napPEOSFvFzLiv8vA7IP/5WmAV1KBTZ/5VOPKtrMHKDTedsBQpGbr68Nr5uPR03s7\n3T8PbEumSiV9Npj6Nqjb4hNq9sIq7mBaDJlcmYnBjpaqUo1zTVICOkUi9nXIk3wN\nqGmFsSxmlg/iNGH92Hwyqq0IRgT13HmlGLLpOv6uy3DaUXdg3Xl7jq/gbjLDTk4e\nUc+0TEA3Qd1djkHUYjqaxNcK+/Ie1GyF8hy6hB9YIkciiShBA8KKFi/Q8mxwIH5D\nfadiFqAwMIzdoPAHMwmQH/qw2PkK1Brk8y2cDIr8peoQPI+UyunbZERdLf+TmbYm\n3RgoTYqHAgMBAAECggEALyh2BI3ktxG3aVMO1O2VgWfdOSXjClpt/QwALeOP42uJ\nHvTyCoIDNzr/uMtf7ts76VoDdAFev7DvyzjZaMMy1wUsNIKDUw3IXu1dNnFStCHv\n5muywBx16Cw0I41GLSrtv1MtDhppxk6RXQUV1gOX5hlGvfzZqmmmqk2rkJNDy9ED\nqBLVt9DCu/MH6TFRrFQAsXSN7BvotXfs2TorSWpxQEyYAHUIHd7l3kMsDFog0nnt\noxGXukJtjOpk7cKjLJN/s+GKUUQRjT5fXKNmFzAJssfqIp8MerRyOVJvQl63rhyG\n1e0iqPEIxCxSE5uW6cNnfwRXUQelIPbZfsOZBmI1AQKBgQDtvdEvXkG7bHx5+3w6\nOsjAPDAwv7RyTQ+vC03hZVAOByUsQUCe/LHAecrYrLyEG7dEv2ILvGt2D02QXCEk\nt8LVA+Dk8pPDZS1fUSYfYFyWX0eTaL1ywjoBNPSuwauo5FmT3W4OAmUovluM0fpk\nkttGdmk1Nr5BAHDYgST8dIWRQwKBgQDgnnVxqmDAjSEBcOtxt2ZUhcZ0nGiqmRE+\nBISuqUmyR18svPn/Z+ERrULM4/JYyJh0IUEW3q5d0qVoZYPrf3ZZNx6nbvwxUFeI\no8e53NoXlxo8uvNDUjoNpbt1mK4+ycrkJz56cymQ3+4yHfQGbDGwn2KfF4aVgqRD\nAqjEuNb7bQKBgGr+7cFKw3yNg6wGgc9XG3hg3jNiY9y5T+CwzrktNo1Jq/Ix39pt\n0bXVWnSPsTwnmSConYC4qH2NKtOu1/iEB58Y1/GyLe8tmHajLS8Uo8ejIEMN48J\nWL+oTKLF6PLW6nXAx0Io08w1d9B1xCI1cdhRfGIFpDRu9VqLLNEtw9svAoGBALak\nAikneb53wvOyBrATiXCGyiS9nVnCVsPP1rdSzarZ3+i3zKvBor/F20BQxRkuGtCq\nzYs0DCIcCwVFLixKG0hVymYol4Xdpx9i1R8rFmcCJYJmHTGLZcr9DN2FBYHmgURd\nKK9WfuDfRIaZ1nd2eDz+jKmB7pwZe0lFm0dCaQRNAoGAGNqYxXyY64TmQjL6z6WR\nREfFhx3z5bjtc5Z2/JIT7QLCCZJzd/ObKW0xdJ+h3uvUemYFMJt3V4aBVhtlzGxr\nUQ0eaOw+61wDYTc7pwHp6XpBs5G56DmSzmPTPtDM0TWoBK/qXVYxjq8N4uwofun\nYKi8CaOnXQDNl/T1wj34RSo=\n-----END PRIVATE KEY-----", height=200, help="Tu clave privada completa", key="private_key")
         
         submitted = st.form_submit_button("💾 Guardar Credenciales", type="primary", use_container_width=True, help="Guarda las credenciales localmente")
         
@@ -406,11 +417,11 @@ with tab5:
             col1, col2 = st.columns(2)
             
             with col1:
-                if st.button("📂 Ver Backup Actual", type="secondary", use_container_width=True, help="Abre tu spreadsheet existente"):
+                if st.button("📂 Ver Backup Actual", type="secondary", use_container_width=True, key="ver_backup"):
                     st.markdown(f"📁 **[🔗 Abrir Backup Actual]({EXISTING_SPREADSHEET})**")
             
             with col2:
-                if st.button("🆕 Crear Nuevo Backup", type="primary", use_container_width=True, help="Crea un nuevo spreadsheet adicional"):
+                if st.button("🆕 Crear Nuevo Backup", type="primary", use_container_width=True, key="crear_backup"):
                     try:
                         import gspread
                         from oauth2client.service_account import ServiceAccountCredentials
@@ -463,7 +474,7 @@ with tab5:
             
             # Botón para eliminar credenciales
             st.markdown("---")
-            if st.button("🗑️ Eliminar Credenciales", use_container_width=True, help="Elimina las credenciales guardadas localmente"):
+            if st.button("🗑️ Eliminar Credenciales", use_container_width=True, key="eliminar_credenciales"):
                 os.remove('google_drive_credentials.json')
                 st.success("✅ **Credenciales eliminadas exitosamente!**")
                 st.rerun()
