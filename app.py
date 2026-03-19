@@ -866,25 +866,29 @@ if st.session_state.accion_actual == "dashboard":
     with col1:
         if st.button("📊 Agregar Datos Simulados Completos", type="primary"):
             with st.spinner("Generando datos..."):
-                if agregar_datos_simulados_completos():
-                    st.success(f"✅ Datos simulados agregados!")
-                    st.info("� 6 evaluaciones por trimestre por alumno")
-                    st.info("� Datos para los 3 trimestres")
-                    # Sincronizar inmediatamente con Google Sheets
-                    with st.spinner("Sincronizando con Google Sheets..."):
-                        ok, mensaje = sincronizar_google_sheets()
-                        if ok:
-                            st.success(f"✅ Google Sheets actualizado!")
-                        else:
-                            st.warning(f"⚠️ Sheets: {mensaje}")
-                    st.rerun()
-                else:
-                    st.error("❌ Error generando datos")
+                try:
+                    if agregar_datos_simulados_completos():
+                        st.success("✅ Datos simulados agregados!")
+                        st.info("📊 10 alumnos por curso, 6 cursos")
+                        st.info("📝 6 evaluaciones por trimestre")
+                        st.info("📅 Datos para los 3 trimestres")
+                        with st.spinner("Sincronizando con Google Sheets..."):
+                            ok, mensaje = sincronizar_google_sheets()
+                            if ok:
+                                st.success("✅ Google Sheets actualizado!")
+                            else:
+                                st.warning(f"⚠️ Sheets: {mensaje}")
+                        st.rerun()
+                    else:
+                        st.error("❌ Error generando datos")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
     with col2:
         if st.button("🔄 Actualizar Datos", type="secondary"):
             st.rerun()
     with col3:
         st.write("")
+    
 
 elif st.session_state.accion_actual == "agregar_alumno":
     st.header("👤 Agregar Nuevo Alumno")
