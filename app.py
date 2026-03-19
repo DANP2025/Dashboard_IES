@@ -60,15 +60,29 @@ def sincronizar_google_sheets():
         import gspread
         from google.oauth2.service_account import Credentials
 
-        creds_dict = dict(st.secrets["gcp_service_account"])
+        # Leer credenciales desde secrets.toml
+        creds_info = {
+            "type": st.secrets["gcp_service_account"]["type"],
+            "project_id": st.secrets["gcp_service_account"]["project_id"],
+            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+            "private_key": st.secrets["gcp_service_account"]["private_key"],
+            "client_email": st.secrets["gcp_service_account"]["client_email"],
+            "client_id": st.secrets["gcp_service_account"]["client_id"],
+            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+        }
+
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
         client = gspread.authorize(creds)
 
-        SPREADSHEET_ID = "10sSBzhpkEPYk78jEctV6XzRoyFJpaYznQPnv9T6VpPc"
+        # Leer sheet_id desde secrets
+        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
         spreadsheet = client.open_by_key(SPREADSHEET_ID)
 
         archivo_excel = "sistema_educativo.xlsx"
