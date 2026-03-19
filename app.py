@@ -986,16 +986,26 @@ elif st.session_state.accion_actual == "evaluaciones":
                     try:
                         cambios_guardados = 0
                         for key, cambios in st.session_state.evaluaciones_cambios.items():
-                            partes = key.split("_")
-                            idx = int(partes[0])
-                            j = int(partes[1])
-
-                            eval_col = f"Eval {j}"
-                            calif_col = f"Calif {j}"
-
-                            df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
-                            df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
-                            cambios_guardados += 1
+                            try:
+                                # Keys normales: "idx_j" (ej: "0_1")
+                                # Keys nuevas: "nueva_idx_numero"
+                                partes = key.split("_")
+                                
+                                if key.startswith("nueva_"):
+                                    # Evaluación nueva — no se guarda en columnas fijas por ahora
+                                    continue
+                                
+                                if len(partes) >= 2:
+                                    idx = int(partes[0])
+                                    j = int(partes[1])
+                                    eval_col = f"Eval {j}"
+                                    calif_col = f"Calif {j}"
+                                    if eval_col in df_evaluaciones.columns:
+                                        df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
+                                        df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
+                                        cambios_guardados += 1
+                            except (ValueError, KeyError):
+                                continue
 
                         # Recalcular nota final
                         for idx, row in df_evaluaciones.iterrows():
@@ -1508,11 +1518,11 @@ elif st.session_state.accion_actual == "reporte":
                     if promedio_final_trimestre >= 9:
                         alerta_borde = "#27ae60"
                         alerta_color = "#1a7a4a"
-                        alerta_icono = "�"
+                        alerta_icono = "🟢"
                     elif promedio_final_trimestre >= 8:
                         alerta_borde = "#2980b9"
                         alerta_color = "#1a4a7a"
-                        alerta_icono = "�"
+                        alerta_icono = "🔵"
                     elif promedio_final_trimestre >= 7:
                         alerta_borde = "#27ae60"
                         alerta_color = "#1a5c3a"
