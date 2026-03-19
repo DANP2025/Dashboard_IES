@@ -806,9 +806,7 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.markdown("---")
     
     try:
-        # Intentar leer desde Excel local
         df_evaluaciones = pd.read_excel(archivo_excel, sheet_name=trimestre_eval)
-        # Si está vacío, intentar desde Sheets
         if df_evaluaciones.empty and GOOGLE_SHEETS_DISPONIBLE:
             df_sheets = cargar_datos_desde_sheets(trimestre_eval)
             if df_sheets is not None and not df_sheets.empty:
@@ -820,176 +818,176 @@ elif st.session_state.accion_actual == "evaluaciones":
             df_sheets = cargar_datos_desde_sheets(trimestre_eval)
             if df_sheets is not None and not df_sheets.empty:
                 df_evaluaciones = df_sheets
-        
-        if curso_eval != "Todos":
+
+    if curso_eval != "Todos":
+        if not df_evaluaciones.empty and "Curso" in df_evaluaciones.columns:
             df_evaluaciones = df_evaluaciones[df_evaluaciones["Curso"] == curso_eval]
+
+    if not df_evaluaciones.empty:
+        # Resumen de evaluaciones cargadas
+        total_alumnos_eval = len(df_evaluaciones[df_evaluaciones["Apellido y Nombre"].notna()])
+        total_evals = 0
+        for _, row in df_evaluaciones.iterrows():
+            for j in range(1, 7):
+                if pd.notna(row.get(f"Eval {j}")) and pd.notna(row.get(f"Calif {j}")):
+                    total_evals += 1
+
+        col_i1, col_i2, col_i3 = st.columns(3)
+        with col_i1:
+            st.metric("👥 Alumnos cargados", total_alumnos_eval)
+        with col_i2:
+            st.metric("📝 Evaluaciones totales", total_evals)
+        with col_i3:
+            st.metric("📅 Trimestre activo", trimestre_eval)
+        st.markdown("---")
         
-        if not df_evaluaciones.empty:
-            # Resumen de evaluaciones cargadas
-            total_alumnos_eval = len(df_evaluaciones[df_evaluaciones["Apellido y Nombre"].notna()])
-            total_evals = 0
-            for _, row in df_evaluaciones.iterrows():
+        st.write("📝 **Evaluaciones** - Formato consistente (nombre arriba, nombre abajo)")
+        
+        if 'evaluaciones_cambios' not in st.session_state:
+            st.session_state.evaluaciones_cambios = {}
+        
+        for idx, row in df_evaluaciones.iterrows():
+            if pd.notna(row["Apellido y Nombre"]):
+                st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
+                
+                # Encabezado visual
+                col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 3, 2, 2, 1])
+                with col_h1:
+                    st.caption("Nro.")
+                with col_h2:
+                    st.caption("Nombre de la evaluación")
+                with col_h3:
+                    st.caption("Calificación")
+                with col_h4:
+                    st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
+                with col_h5:
+                    st.caption("Estado")
+                
                 for j in range(1, 7):
-                    if pd.notna(row.get(f"Eval {j}")) and pd.notna(row.get(f"Calif {j}")):
-                        total_evals += 1
-
-            col_i1, col_i2, col_i3 = st.columns(3)
-            with col_i1:
-                st.metric("👥 Alumnos cargados", total_alumnos_eval)
-            with col_i2:
-                st.metric("📝 Evaluaciones totales", total_evals)
-            with col_i3:
-                st.metric("📅 Trimestre activo", trimestre_eval)
-            st.markdown("---")
-            
-            st.write("📝 **Evaluaciones** - Formato consistente (nombre arriba, nombre abajo)")
-            
-            if 'evaluaciones_cambios' not in st.session_state:
-                st.session_state.evaluaciones_cambios = {}
-            
-            for idx, row in df_evaluaciones.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
+                    eval_col = f"Eval {j}"
+                    calif_col = f"Calif {j}"
                     
-                    # Encabezado visual
-                    col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 3, 2, 2, 1])
-                    with col_h1:
-                        st.caption("Nro.")
-                    with col_h2:
-                        st.caption("Nombre de la evaluación")
-                    with col_h3:
-                        st.caption("Calificación")
-                    with col_h4:
-                        st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
-                    with col_h5:
-                        st.caption("Estado")
-                    
-                    for j in range(1, 7):
-                        eval_col = f"Eval {j}"
-                        calif_col = f"Calif {j}"
-                        
-                        if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
-                            col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
+                    if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
+                        col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
 
-                            with col1:
-                                tipo_eval = str(row.get('Tipo Evaluación', 'Diagnóstico'))
-                                st.markdown(f"**Eval {j}**")
-                                st.caption(tipo_eval)
+                        with col1:
+                            tipo_eval = str(row.get('Tipo Evaluación', 'Diagnóstico'))
+                            st.markdown(f"**Eval {j}**")
+                            st.caption(tipo_eval)
 
-                            with col2:
-                                nombre_eval_actual = st.text_input(
-                                    f"Nombre evaluación {j}",
-                                    value=str(row.get(eval_col, f"Evaluación {j}")),
-                                    key=f"eval_nombre_{idx}_{j}",
-                                    label_visibility="collapsed"
-                                )
+                        with col2:
+                            nombre_eval_actual = st.text_input(
+                                f"Nombre evaluación {j}",
+                                value=str(row.get(eval_col, f"Evaluación {j}")),
+                                key=f"eval_nombre_{idx}_{j}",
+                                label_visibility="collapsed"
+                            )
 
-                            with col3:
-                                calificacion_actual = str(row.get(calif_col, "B"))
-                                opciones_calif = ["M", "R-", "R+", "B", "MB", "EX"]
-                                idx_cal = opciones_calif.index(calificacion_actual) if calificacion_actual in opciones_calif else 3
-                                calificacion = st.selectbox(
-                                    f"Calificación {j}",
-                                    opciones_calif,
-                                    index=idx_cal,
-                                    key=f"eval_calif_{idx}_{j}",
-                                    label_visibility="collapsed"
-                                )
+                        with col3:
+                            calificacion_actual = str(row.get(calif_col, "B"))
+                            opciones_calif = ["M", "R-", "R+", "B", "MB", "EX"]
+                            idx_cal = opciones_calif.index(calificacion_actual) if calificacion_actual in opciones_calif else 3
+                            calificacion = st.selectbox(
+                                f"Calificación {j}",
+                                opciones_calif,
+                                index=idx_cal,
+                                key=f"eval_calif_{idx}_{j}",
+                                label_visibility="collapsed"
+                            )
 
-                            with col4:
-                                st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
+                        with col4:
+                            st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
 
-                            with col5:
-                                iconos_calif = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
-                                st.markdown(f"### {iconos_calif.get(calificacion, '❓')}")
+                        with col5:
+                            iconos_calif = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
+                            st.markdown(f"### {iconos_calif.get(calificacion, '❓')}")
 
-                            st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
-                                "nombre": nombre_eval_actual,
-                                "calificacion": calificacion,
-                                "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
-                            }
-                    
-                    st.markdown("---")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("💾 Guardar Evaluaciones", type="primary", key="guardar_todos_evaluaciones"):
-                    with st.spinner("Guardando evaluaciones..."):
-                        try:
-                            cambios_guardados = 0
-                            for key, cambios in st.session_state.evaluaciones_cambios.items():
-                                partes = key.split("_")
-                                idx = int(partes[0])
-                                j = int(partes[1])
+                        st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
+                            "nombre": nombre_eval_actual,
+                            "calificacion": calificacion,
+                            "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
+                        }
+                
+                st.markdown("---")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("💾 Guardar Evaluaciones", type="primary", key="guardar_todos_evaluaciones"):
+                with st.spinner("Guardando evaluaciones..."):
+                    try:
+                        cambios_guardados = 0
+                        for key, cambios in st.session_state.evaluaciones_cambios.items():
+                            partes = key.split("_")
+                            idx = int(partes[0])
+                            j = int(partes[1])
 
-                                eval_col = f"Eval {j}"
-                                calif_col = f"Calif {j}"
+                            eval_col = f"Eval {j}"
+                            calif_col = f"Calif {j}"
 
-                                df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
-                                df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
-                                cambios_guardados += 1
+                            df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
+                            df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
+                            cambios_guardados += 1
 
-                            # Recalcular nota final
-                            for idx, row in df_evaluaciones.iterrows():
-                                if pd.notna(row.get("Apellido y Nombre")):
-                                    califs = []
-                                    for i in range(1, 7):
-                                        v = df_evaluaciones.at[idx, f"Calif {i}"]
-                                        if pd.notna(v):
-                                            califs.append(calificacion_a_numero(v))
-                                    if califs:
-                                        promedio_final = sum(califs) / len(califs)
-                                        df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
+                        # Recalcular nota final
+                        for idx, row in df_evaluaciones.iterrows():
+                            if pd.notna(row.get("Apellido y Nombre")):
+                                califs = []
+                                for i in range(1, 7):
+                                    v = df_evaluaciones.at[idx, f"Calif {i}"]
+                                    if pd.notna(v):
+                                        califs.append(calificacion_a_numero(v))
+                                if califs:
+                                    promedio_final = sum(califs) / len(califs)
+                                    df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
 
-                            # Guardar Excel local
-                            if guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel):
-                                st.success(f"✅ {cambios_guardados} evaluaciones guardadas correctamente!")
-                                st.session_state.evaluaciones_cambios = {}
+                        # Guardar Excel local
+                        if guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel):
+                            st.success(f"✅ {cambios_guardados} evaluaciones guardadas correctamente!")
+                            st.session_state.evaluaciones_cambios = {}
+                        else:
+                            st.error("❌ Error guardando Excel local")
+                            st.stop()
+
+                        # Sincronizar con Google Sheets
+                        with st.spinner("Sincronizando con Google Sheets..."):
+                            ok, mensaje = sincronizar_google_sheets()
+                            if ok:
+                                st.success("✅ Google Sheets actualizado!")
                             else:
-                                st.error("❌ Error guardando Excel local")
-                                st.stop()
+                                st.warning(f"⚠️ Excel guardado pero Sheets falló: {mensaje}")
 
-                            # Sincronizar con Google Sheets
-                            with st.spinner("Sincronizando con Google Sheets..."):
-                                ok, mensaje = sincronizar_google_sheets()
-                                if ok:
-                                    st.success("✅ Google Sheets actualizado!")
-                                else:
-                                    st.warning(f"⚠️ Excel guardado pero Sheets falló: {mensaje}")
-
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error inesperado: {e}")
-            with col2:
-                if st.button("🔄 Recargar Datos", type="secondary", key="recargar_evaluaciones"):
-                    st.session_state.evaluaciones_cambios = {}
-                    st.rerun()
-            with col3:
-                calificaciones_contadas = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
-                total_evaluaciones = 0
-                
-                for _, row in df_evaluaciones.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        for i in range(1, 7):
-                            calif = df_evaluaciones.at[row.name, f"Calif {i}"]
-                            if pd.notna(calif):
-                                calificaciones_contadas[calif] += 1
-                                total_evaluaciones += 1
-                
-                if total_evaluaciones > 0:
-                    st.write("#### 📈 Distribución de Calificaciones")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.write("📈 **Distribución calificaciones:**")
-                        for calif, cantidad in calificaciones_contadas.items():
-                            st.write(f"- {calif}: {cantidad}")
-                    with col2:
-                        st.write(f"📊 **Total evaluaciones:** {total_evaluaciones}")
-                    with col3:
-                        st.write(f"📈 **Promedio general:** {total_evaluaciones/6:.1f}")
-    except Exception as e:
-        st.error(f"Error: {e}")
-        st.info("📊 Agrega datos simulados para probar")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error inesperado: {e}")
+        with col2:
+            if st.button("🔄 Recargar Datos", type="secondary", key="recargar_evaluaciones"):
+                st.session_state.evaluaciones_cambios = {}
+                st.rerun()
+        with col3:
+            calificaciones_contadas = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
+            total_evaluaciones = 0
+            
+            for _, row in df_evaluaciones.iterrows():
+                if pd.notna(row["Apellido y Nombre"]):
+                    for i in range(1, 7):
+                        calif = df_evaluaciones.at[row.name, f"Calif {i}"]
+                        if pd.notna(calif):
+                            calificaciones_contadas[calif] += 1
+                            total_evaluaciones += 1
+            
+            if total_evaluaciones > 0:
+                st.write("#### 📈 Distribución de Calificaciones")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.write("📈 **Distribución calificaciones:**")
+                    for calif, cantidad in calificaciones_contadas.items():
+                        st.write(f"- {calif}: {cantidad}")
+                with col2:
+                    st.write(f"📊 **Total evaluaciones:** {total_evaluaciones}")
+                with col3:
+                    st.write(f"📈 **Promedio general:** {total_evaluaciones/6:.1f}")
+    else:
+        st.info("📋 No hay alumnos. Primero agregá datos simulados desde el Dashboard.")
 
 elif st.session_state.accion_actual == "agregar_alumno":
     st.header("👤 Agregar Nuevo Alumno")
