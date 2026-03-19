@@ -65,14 +65,38 @@ def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
         st.error(f"Error guardando en Excel: {e}")
         return False
 
-def sincronizar_google_sheets():
-    """Sincroniza los datos locales con Google Sheets"""
+def restaurar_desde_sheets_si_vacio():
+    """Si el Excel local está vacío, restaura desde Google Sheets"""
     try:
         if not GOOGLE_SHEETS_DISPONIBLE:
-            return False, "Secrets de Google no configurados"
-        
+            return False
+        wb_check = openpyxl.load_workbook(archivo_excel)
+        ws_check = wb_check["1 Trimestre"]
+        tiene_datos = ws_check.max_row > 1
+        wb_check.close()
+        if tiene_datos:
+            return False  # Ya tiene datos, no hace falta restaurar
+
+        # Restaurar desde Sheets
+        restaurado = False
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+            df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel)
+                restaurado = True
+        return restaurado
+    except Exception:
+        return False
+
+def sincronizar_google_sheets():
+    """Sincroniza todos los datos con Google Sheets de forma legible"""
+    try:
         import gspread
         from google.oauth2.service_account import Credentials
+
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return False, "Secrets de Google no configurados"
 
         creds_info = {
             "type": st.secrets["gcp_service_account"]["type"],
@@ -101,18 +125,30 @@ def sincronizar_google_sheets():
         if not os.path.exists(archivo_excel):
             return False, "No existe el archivo Excel local. Primero agregá datos simulados."
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
 
         headers = [
-            "Fecha y Hora Actualización", "Apellido y Nombre", "Curso", "Trimestre",
-            "Días Presentes", "Días Ausentes", "% Asistencia", "Nota Asistencia",
-            "Eval 1 - Nombre", "Eval 1 - Calif",
-            "Eval 2 - Nombre", "Eval 2 - Calif",
-            "Eval 3 - Nombre", "Eval 3 - Calif",
-            "Eval 4 - Nombre", "Eval 4 - Calif",
-            "Eval 5 - Nombre", "Eval 5 - Calif",
-            "Eval 6 - Nombre", "Eval 6 - Calif",
-            "Promedio Final Evaluaciones"
+            "Última Actualización",
+            "Apellido y Nombre",
+            "Curso",
+            "Trimestre",
+            "Días Presentes",
+            "Días Ausentes",
+            "% Asistencia",
+            "Nota Asistencia",
+            "Eval 1 — Nombre",
+            "Eval 1 — Calif",
+            "Eval 2 — Nombre",
+            "Eval 2 — Calif",
+            "Eval 3 — Nombre",
+            "Eval 3 — Calif",
+            "Eval 4 — Nombre",
+            "Eval 4 — Calif",
+            "Eval 5 — Nombre",
+            "Eval 5 — Calif",
+            "Eval 6 — Nombre",
+            "Eval 6 — Calif",
+            "Promedio Final"
         ]
 
         for trimestre_num in range(1, 4):
@@ -121,9 +157,7 @@ def sincronizar_google_sheets():
             try:
                 ws = spreadsheet.worksheet(nombre_trimestre)
             except Exception:
-                ws = spreadsheet.add_worksheet(
-                    title=nombre_trimestre, rows=500, cols=25
-                )
+                ws = spreadsheet.add_worksheet(title=nombre_trimestre, rows=500, cols=25)
 
             try:
                 df = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
@@ -176,18 +210,26 @@ def sincronizar_google_sheets():
             ws.clear()
             ws.update(rows_data, value_input_option="USER_ENTERED")
 
+            # Formato encabezado
             ws.format("A1:U1", {
-                "backgroundColor": {
-                    "red": 0.212, "green": 0.380, "blue": 0.573
-                },
+                "backgroundColor": {"red": 0.118, "green": 0.227, "blue": 0.373},
                 "textFormat": {
                     "bold": True,
+                    "fontSize": 10,
                     "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
                 },
                 "horizontalAlignment": "CENTER"
             })
 
-        return True, f"Sincronizado correctamente a las {timestamp}"
+            # Formato filas de datos
+            if len(rows_data) > 1:
+                rango_datos = f"A2:U{len(rows_data)}"
+                ws.format(rango_datos, {
+                    "textFormat": {"fontSize": 10},
+                    "horizontalAlignment": "LEFT"
+                })
+
+        return True, f"Sincronizado el {timestamp}"
 
     except Exception as e:
         return False, str(e)
@@ -466,13 +508,13 @@ def generar_backup_detalles():
         return False
 
 def sincronizar_google_sheets():
-    """Sincroniza los datos locales con Google Sheets"""
+    """Sincroniza todos los datos con Google Sheets de forma legible"""
     try:
-        if not GOOGLE_SHEETS_DISPONIBLE:
-            return False, "Secrets de Google no configurados"
-        
         import gspread
         from google.oauth2.service_account import Credentials
+
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return False, "Secrets de Google no configurados"
 
         creds_info = {
             "type": st.secrets["gcp_service_account"]["type"],
@@ -501,18 +543,30 @@ def sincronizar_google_sheets():
         if not os.path.exists(archivo_excel):
             return False, "No existe el archivo Excel local. Primero agregá datos simulados."
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
 
         headers = [
-            "Fecha y Hora Actualización", "Apellido y Nombre", "Curso", "Trimestre",
-            "Días Presentes", "Días Ausentes", "% Asistencia", "Nota Asistencia",
-            "Eval 1 - Nombre", "Eval 1 - Calif",
-            "Eval 2 - Nombre", "Eval 2 - Calif",
-            "Eval 3 - Nombre", "Eval 3 - Calif",
-            "Eval 4 - Nombre", "Eval 4 - Calif",
-            "Eval 5 - Nombre", "Eval 5 - Calif",
-            "Eval 6 - Nombre", "Eval 6 - Calif",
-            "Promedio Final Evaluaciones"
+            "Última Actualización",
+            "Apellido y Nombre",
+            "Curso",
+            "Trimestre",
+            "Días Presentes",
+            "Días Ausentes",
+            "% Asistencia",
+            "Nota Asistencia",
+            "Eval 1 — Nombre",
+            "Eval 1 — Calif",
+            "Eval 2 — Nombre",
+            "Eval 2 — Calif",
+            "Eval 3 — Nombre",
+            "Eval 3 — Calif",
+            "Eval 4 — Nombre",
+            "Eval 4 — Calif",
+            "Eval 5 — Nombre",
+            "Eval 5 — Calif",
+            "Eval 6 — Nombre",
+            "Eval 6 — Calif",
+            "Promedio Final"
         ]
 
         for trimestre_num in range(1, 4):
@@ -521,9 +575,7 @@ def sincronizar_google_sheets():
             try:
                 ws = spreadsheet.worksheet(nombre_trimestre)
             except Exception:
-                ws = spreadsheet.add_worksheet(
-                    title=nombre_trimestre, rows=500, cols=25
-                )
+                ws = spreadsheet.add_worksheet(title=nombre_trimestre, rows=500, cols=25)
 
             try:
                 df = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
@@ -576,18 +628,26 @@ def sincronizar_google_sheets():
             ws.clear()
             ws.update(rows_data, value_input_option="USER_ENTERED")
 
+            # Formato encabezado
             ws.format("A1:U1", {
-                "backgroundColor": {
-                    "red": 0.212, "green": 0.380, "blue": 0.573
-                },
+                "backgroundColor": {"red": 0.118, "green": 0.227, "blue": 0.373},
                 "textFormat": {
                     "bold": True,
+                    "fontSize": 10,
                     "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
                 },
                 "horizontalAlignment": "CENTER"
             })
 
-        return True, f"Sincronizado correctamente a las {timestamp}"
+            # Formato filas de datos
+            if len(rows_data) > 1:
+                rango_datos = f"A2:U{len(rows_data)}"
+                ws.format(rango_datos, {
+                    "textFormat": {"fontSize": 10},
+                    "horizontalAlignment": "LEFT"
+                })
+
+        return True, f"Sincronizado el {timestamp}"
 
     except Exception as e:
         return False, str(e)
@@ -767,26 +827,11 @@ def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
 
 archivo_excel = crear_excel_si_no_existe()
 
-# Si el Excel no tiene datos (Streamlit Cloud reinició),
-# restaurar desde Google Sheets automáticamente
+# Restaurar desde Google Sheets si Streamlit reinició y perdió los datos
 if GOOGLE_SHEETS_DISPONIBLE:
     try:
-        wb_check = openpyxl.load_workbook(archivo_excel)
-        ws_check = wb_check["1 Trimestre"]
-        tiene_datos = ws_check.max_row > 1
-        wb_check.close()
-
-        if not tiene_datos:
-            with st.spinner("🔄 Restaurando datos desde Google Sheets..."):
-                restaurado = False
-                for trimestre_num in range(1, 4):
-                    nombre_trimestre = f"{trimestre_num} Trimestre"
-                    df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
-                    if df_sheets is not None and not df_sheets.empty:
-                        guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel)
-                        restaurado = True
-                if restaurado:
-                    st.success("✅ Datos restaurados desde Google Sheets!")
+        if restaurar_desde_sheets_si_vacio():
+            st.toast("✅ Datos restaurados desde Google Sheets", icon="☁️")
     except Exception:
         pass
 
@@ -975,29 +1020,43 @@ elif st.session_state.accion_actual == "asistencia":
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button("💾 Guardar Todos los Cambios", type="primary", key="guardar_todos_asistencia"):
-                    cambios_guardados = 0
-                    for key, presente in st.session_state.asistencia_cambios.items():
-                        if fecha_str in key:
-                            idx = int(key.split("_")[0])
-                            df_asistencia.at[idx, fecha_str] = "Presente" if presente else "Ausente"
-                            cambios_guardados += 1
-                    
-                    columnas_asistencia = [col for col in df_asistencia.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                    for idx, row in df_asistencia.iterrows():
-                        if pd.notna(row["Apellido y Nombre"]):
-                            presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                            totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                            nota_asistencia = calcular_nota_asistencia(presentes, totales)
-                            df_asistencia.at[idx, "Nota Asistencia"] = nota_asistencia
-                    
-                    if guardar_datos_excel(df_asistencia, trimestre_asistencia, archivo_excel):
-                        st.success(f"✅ {cambios_guardados} cambios guardados!")
-                        st.info(f"📁 Datos guardados en: {os.path.abspath(archivo_excel)}")
-                        st.session_state.asistencia_cambios = {}
-                        st.rerun()
-                    else:
-                        st.error("❌ Error guardando cambios")
+                if st.button("💾 Guardar Asistencia", type="primary", key="guardar_todos_asistencia"):
+                    with st.spinner("Guardando asistencia..."):
+                        try:
+                            cambios_guardados = 0
+                            for key, presente in st.session_state.asistencia_cambios.items():
+                                if fecha_str in key:
+                                    idx = int(key.split("_")[0])
+                                    df_asistencia.at[idx, fecha_str] = "Presente" if presente else "Ausente"
+                                    cambios_guardados += 1
+
+                            # Recalcular nota asistencia
+                            columnas_asistencia = [col for col in df_asistencia.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                            for idx, row in df_asistencia.iterrows():
+                                if pd.notna(row["Apellido y Nombre"]):
+                                    presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
+                                    totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                                    df_asistencia.at[idx, "Nota Asistencia"] = calcular_nota_asistencia(presentes, totales)
+
+                            # Guardar Excel local
+                            if guardar_datos_excel(df_asistencia, trimestre_asistencia, archivo_excel):
+                                st.success(f"✅ Asistencia del {fecha_seleccionada.strftime('%d/%m/%Y')} guardada — {cambios_guardados} registros")
+                                st.session_state.asistencia_cambios = {}
+                            else:
+                                st.error("❌ Error guardando Excel local")
+                                st.stop()
+
+                            # Sincronizar con Google Sheets
+                            with st.spinner("Sincronizando con Google Sheets..."):
+                                ok, mensaje = sincronizar_google_sheets()
+                                if ok:
+                                    st.success("✅ Google Sheets actualizado!")
+                                else:
+                                    st.warning(f"⚠️ Excel guardado pero Sheets falló: {mensaje}")
+
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error: {e}")
             
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_asistencia"):
@@ -1238,11 +1297,10 @@ elif st.session_state.accion_actual == "evaluaciones":
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button("💾 Guardar Todos los Cambios", type="primary", key="guardar_todos_evaluaciones"):
-                    with st.spinner("Guardando cambios..."):
-                        cambios_guardados = 0
+                if st.button("💾 Guardar Evaluaciones", type="primary", key="guardar_todos_evaluaciones"):
+                    with st.spinner("Guardando evaluaciones..."):
                         try:
-                            # Aplicar cambios al dataframe
+                            cambios_guardados = 0
                             for key, cambios in st.session_state.evaluaciones_cambios.items():
                                 partes = key.split("_")
                                 idx = int(partes[0])
@@ -1255,42 +1313,37 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
                                 cambios_guardados += 1
 
-                            # Recalcular nota final de cada alumno
+                            # Recalcular nota final
                             for idx, row in df_evaluaciones.iterrows():
                                 if pd.notna(row.get("Apellido y Nombre")):
-                                    calificaciones_temp = []
+                                    califs = []
                                     for i in range(1, 7):
-                                        calif_val = df_evaluaciones.at[idx, f"Calif {i}"]
-                                        if pd.notna(calif_val):
-                                            calificaciones_temp.append(calificacion_a_numero(calif_val))
-                                    if calificaciones_temp:
-                                        promedio_final = sum(calificaciones_temp) / len(calificaciones_temp)
+                                        v = df_evaluaciones.at[idx, f"Calif {i}"]
+                                        if pd.notna(v):
+                                            califs.append(calificacion_a_numero(v))
+                                    if califs:
+                                        promedio_final = sum(califs) / len(califs)
                                         df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
 
-                            # Guardar en Excel local
-                            exito_local = guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel)
-
-                            if exito_local:
-                                ruta_absoluta = os.path.abspath(archivo_excel)
-                                st.success(f"✅ {cambios_guardados} cambios guardados en Excel!")
-                                st.info(f"📁 Archivo guardado en: {ruta_absoluta}")
+                            # Guardar Excel local
+                            if guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel):
+                                st.success(f"✅ {cambios_guardados} evaluaciones guardadas correctamente!")
                                 st.session_state.evaluaciones_cambios = {}
                             else:
-                                st.error("❌ Error al guardar en Excel local")
+                                st.error("❌ Error guardando Excel local")
                                 st.stop()
 
-                            # Guardar en Google Sheets
+                            # Sincronizar con Google Sheets
                             with st.spinner("Sincronizando con Google Sheets..."):
                                 ok, mensaje = sincronizar_google_sheets()
                                 if ok:
-                                    st.success(f"✅ Google Sheets actualizado: {mensaje}")
+                                    st.success("✅ Google Sheets actualizado!")
                                 else:
-                                    st.warning(f"⚠️ Excel guardado pero Google Sheets falló: {mensaje}")
+                                    st.warning(f"⚠️ Excel guardado pero Sheets falló: {mensaje}")
 
                             st.rerun()
-
                         except Exception as e:
-                            st.error(f"❌ Error inesperado al guardar: {e}")
+                            st.error(f"❌ Error inesperado: {e}")
             
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_evaluaciones"):
