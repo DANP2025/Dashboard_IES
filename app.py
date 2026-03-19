@@ -366,11 +366,20 @@ def agregar_datos_simulados_completos():
                 df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
                 
                 for curso in cursos:
-                    alumnos_curso = [n for n in nombres_femeninos if curso in n] + [n for n in nombres_adicionales_ef1a if curso in n]
                     if curso == "EF 1A":
-                        alumnos_curso = alumnos_curso[:5]
+                        alumnos_curso = nombres_femeninos[:5] + nombres_adicionales_ef1a[:5]
                     elif curso == "EF 2A":
-                        alumnos_curso = alumnos_curso[:5]
+                        alumnos_curso = nombres_femeninos[:5]
+                    elif curso == "EF 1B":
+                        alumnos_curso = nombres_femeninos[5:] + nombres_adicionales_ef1a[:5]
+                    elif curso == "EF 2B":
+                        alumnos_curso = nombres_femeninos[:5] + nombres_adicionales_ef1a[3:]
+                    elif curso == "TD 2A":
+                        alumnos_curso = nombres_femeninos[3:8]
+                    elif curso == "TD 2B":
+                        alumnos_curso = nombres_femeninos[2:7]
+                    else:
+                        alumnos_curso = nombres_femeninos[:5]
                     
                     for alumno in alumnos_curso:
                         if alumno not in df_trimestre["Apellido y Nombre"].values:
