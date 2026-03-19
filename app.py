@@ -613,17 +613,19 @@ if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backu
             st.sidebar.error("❌ Error generando backup Excel")
     except Exception as e:
         st.sidebar.error(f"❌ Error Excel: {e}")
+    try:
+        with st.sidebar:
+            with st.spinner("Sincronizando Google Sheets..."):
+                ok, mensaje = sincronizar_google_sheets()
+                if ok:
+                    st.sidebar.success(f"✅ Google Sheets: {mensaje}")
+                else:
+                    st.sidebar.error(f"❌ Google Sheets: {mensaje}")
+    except Exception as e:
+        st.sidebar.error(f"❌ Error Sheets: {e}")
 
 if st.sidebar.button("📜 Ver Historial", type="secondary", key="btn_historial"):
     st.session_state.accion_actual = "historial"
-
-    with st.sidebar:
-        with st.spinner("Sincronizando Google Sheets..."):
-            ok, mensaje = sincronizar_google_sheets()
-            if ok:
-                st.sidebar.success(f"✅ Google Sheets: {mensaje}")
-            else:
-                st.sidebar.error(f"❌ Google Sheets: {mensaje}")
 
 # Restaurar desde Google Sheets si Streamlit reinició y perdió los datos
 if GOOGLE_SHEETS_DISPONIBLE:
@@ -1578,6 +1580,192 @@ elif st.session_state.accion_actual == "estadistica":
             st.session_state.ver_curso_completo = False
             st.rerun()
         st.markdown("---")
+    
+    # Estadística individual
+    if not st.session_state.get("ver_curso_completo", False):
+        try:
+            df_stats = pd.read_excel(archivo_excel, sheet_name=trimestre_stats)
+            if df_stats.empty and GOOGLE_SHEETS_DISPONIBLE:
+                df_sheets = cargar_datos_desde_sheets(trimestre_stats)
+                if df_sheets is not None and not df_sheets.empty:
+                    guardar_datos_excel(df_sheets, trimestre_stats, archivo_excel)
+                    df_stats = df_sheets
+
+            if curso_stats != "Todos":
+                df_stats = df_stats[df_stats["Curso"] == curso_stats]
+            if alumno_stats != "Todos":
+                df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
+
+            if not df_stats.empty:
+                for idx, row in df_stats.iterrows():
+                    if pd.notna(row.get("Apellido y Nombre")):
+
+                        st.markdown(f"""
+                        <div style='background:linear-gradient(135deg,#1e3a5f,#2d6a9f);
+                        padding:16px 20px;border-radius:12px;margin-bottom:16px;'>
+                            <div style='font-size:20px;font-weight:700;color:white;'>
+                                👤 {row['Apellido y Nombre']}
+                            </div>
+                            <div style='color:#a8c8e8;font-size:14px;margin-top:4px;'>
+                                📂 {row['Curso']} &nbsp;|&nbsp; 📅 {trimestre_stats}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        st.markdown('<div class="seccion-titulo">📋 ASISTENCIA</div>', unsafe_allow_html=True)
+
+                        if periodo == "Marzo":
+                            prefijos = ["Mar-"]
+                        elif periodo == "Abril":
+                            prefijos = ["Abr-"]
+                        elif periodo == "Mayo":
+                            prefijos = ["May-"]
+                        else:
+                            prefijos = ["Mar-", "Abr-", "May-"]
+
+                        columnas_asistencia = [
+                            col for col in df_stats.columns
+                            if any(mes in str(col) for mes in prefijos)
+                        ]
+                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row.get(col)) and row.get(col) == "Presente")
+                        totales = sum(1 for col in columnas_asistencia if pd.notna(row.get(col)))
+                        ausentes = totales - presentes
+                        porcentaje = round((presentes / totales * 100), 1) if totales > 0 else 0
+                        nota_asistencia = calcular_nota_asistencia(presentes, totales)
+
+                        if nota_asistencia == 10:
+                            badge_asist = '<span class="badge-ex">EX — 10</span>'
+                        elif nota_asistencia == 8:
+                            badge_asist = '<span class="badge-b">B — 8</span>'
+                        else:
+                            badge_asist = '<span class="badge-m">M — 5</span>'
+
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">Días Presentes</div>
+                                <div class="stat-value">{presentes}</div>
+                                <div class="stat-sub">de {totales} clases</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">Días Ausentes</div>
+                                <div class="stat-value">{ausentes}</div>
+                                <div class="stat-sub">faltas registradas</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col3:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">% Asistencia</div>
+                                <div class="stat-value">{porcentaje}%</div>
+                                <div class="stat-sub">{"✅ Regular" if porcentaje >= 80 else "⚠️ Irregular"}</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col4:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">Calif. Asistencia</div>
+                                <div class="stat-value">{nota_asistencia}</div>
+                                <div class="stat-sub">{badge_asist}</div>
+                            </div>""", unsafe_allow_html=True)
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.markdown('<div class="seccion-titulo">📝 EVALUACIONES</div>', unsafe_allow_html=True)
+
+                        evaluaciones_detalle = []
+                        calificaciones_todas = []
+
+                        evaluaciones_detalle.append({
+                            "N°": "A",
+                            "Evaluación": "Asistencia al Trimestre",
+                            "Calificación": "EX" if nota_asistencia == 10 else ("B" if nota_asistencia == 8 else "M"),
+                            "Valor": nota_asistencia,
+                            "es_asistencia": True
+                        })
+                        calificaciones_todas.append(nota_asistencia)
+
+                        for i in range(1, 7):
+                            eval_col = f"Eval {i}"
+                            calif_col = f"Calif {i}"
+                            if pd.notna(row.get(eval_col)) and pd.notna(row.get(calif_col)):
+                                calif_val = str(row.get(calif_col))
+                                calif_num = calificacion_a_numero(calif_val)
+                                evaluaciones_detalle.append({
+                                    "N°": i,
+                                    "Evaluación": str(row.get(eval_col)),
+                                    "Calificación": calif_val,
+                                    "Valor": calif_num,
+                                    "es_asistencia": False
+                                })
+                                calificaciones_todas.append(calif_num)
+
+                        if evaluaciones_detalle:
+                            badges = {
+                                "EX": ("badge-ex", "#1a7a4a"),
+                                "MB": ("badge-mb", "#2d6a9f"),
+                                "B":  ("badge-b",  "#4a90d9"),
+                                "R+": ("badge-rp", "#e8a020"),
+                                "R-": ("badge-rm", "#d4601a"),
+                                "M":  ("badge-m",  "#c0392b")
+                            }
+                            for ev in evaluaciones_detalle:
+                                calif = ev["Calificación"]
+                                badge_class, _ = badges.get(calif, ("badge-b", "#4a90d9"))
+                                es_asist = ev.get("es_asistencia", False)
+                                bg_row = "rgba(26,122,74,0.08)" if es_asist else "transparent"
+                                col1, col2, col3 = st.columns([1, 6, 2])
+                                with col1:
+                                    st.markdown(f"<div style='padding:8px 4px;text-align:center;font-weight:700;color:#1e3a5f;font-size:14px;background:{bg_row};border-radius:6px;'>#{ev['N°']}</div>", unsafe_allow_html=True)
+                                with col2:
+                                    icono = "📋 " if es_asist else ""
+                                    st.markdown(f"<div style='padding:8px 4px;color:#2c3e50;font-size:14px;font-weight:{'600' if es_asist else '400'};background:{bg_row};border-radius:6px;'>{icono}{ev['Evaluación']}</div>", unsafe_allow_html=True)
+                                with col3:
+                                    st.markdown(f"<div style='padding:8px 0px;text-align:left;background:{bg_row};border-radius:6px;'><span class='{badge_class}' style='font-size:13px;'>{calif} ({ev['Valor']})</span></div>", unsafe_allow_html=True)
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            st.markdown('<div class="seccion-titulo">🏆 CALIFICACIÓN PROMEDIO FINAL DEL TRIMESTRE</div>', unsafe_allow_html=True)
+
+                            promedio_final_trimestre = round(sum(calificaciones_todas) / len(calificaciones_todas), 1)
+
+                            if promedio_final_trimestre >= 9:
+                                alerta_color = "#1a7a4a"
+                                alerta_borde = "#27ae60"
+                                alerta_icono = "🟢"
+                            elif promedio_final_trimestre >= 8:
+                                alerta_color = "#1a4a7a"
+                                alerta_borde = "#2980b9"
+                                alerta_icono = "🔵"
+                            elif promedio_final_trimestre >= 7:
+                                alerta_color = "#1a5c3a"
+                                alerta_borde = "#27ae60"
+                                alerta_icono = "🟢"
+                            elif promedio_final_trimestre >= 6:
+                                alerta_color = "#7a5a00"
+                                alerta_borde = "#f39c12"
+                                alerta_icono = "🟡"
+                            else:
+                                alerta_color = "#7a1a1a"
+                                alerta_borde = "#e74c3c"
+                                alerta_icono = "🔴"
+
+                            st.markdown(f"""
+                            <div style='border-left:5px solid {alerta_borde};
+                            background:linear-gradient(135deg,{alerta_color}22,{alerta_color}11);
+                            padding:20px 24px;border-radius:10px;margin:10px 0;
+                            display:flex;align-items:center;gap:16px;'>
+                                <div style='font-size:48px;'>{alerta_icono}</div>
+                                <div>
+                                    <div style='font-size:40px;font-weight:800;
+                                    color:{alerta_borde};line-height:1;'>{promedio_final_trimestre}</div>
+                                    <div style='font-size:11px;color:#7f8c8d;margin-top:6px;'>
+                                        Promedio de {len(calificaciones_todas)} evaluaciones incluyendo asistencia
+                                    </div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        break
+            else:
+                st.info("📋 No hay datos para analizar. Seleccioná un alumno.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+            st.info("📊 Primero agregá datos simulados desde el Dashboard.")
     
     # Filtrar columnas de asistencia según período seleccionado
     # (esta variable se usa más abajo en el bloque try existente)
