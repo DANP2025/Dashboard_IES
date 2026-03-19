@@ -242,19 +242,19 @@ def sincronizar_google_sheets():
             "Días Ausentes",
             "% Asistencia",
             "Nota Asistencia",
-            "Eval 1 — Nombre",
-            "Eval 1 — Calif",
-            "Eval 2 — Nombre",
-            "Eval 2 — Calif",
-            "Eval 3 — Nombre",
-            "Eval 3 — Calif",
-            "Eval 4 — Nombre",
-            "Eval 4 — Calif",
-            "Eval 5 — Nombre",
-            "Eval 5 — Calif",
-            "Eval 6 — Nombre",
-            "Eval 6 — Calif",
-            "Promedio Final"
+            "Eval 1",
+            "Calif 1",
+            "Eval 2",
+            "Calif 2",
+            "Eval 3",
+            "Calif 3",
+            "Eval 4",
+            "Calif 4",
+            "Eval 5",
+            "Calif 5",
+            "Eval 6",
+            "Calif 6",
+            "Nota Final Evaluaciones"
         ]
 
         for trimestre_num in range(1, 4):
@@ -1543,9 +1543,16 @@ elif st.session_state.accion_actual == "estadistica":
 
     col_p1, col_p2, col_p3 = st.columns(3)
     with col_p1:
+        if trimestre_stats == "1 Trimestre":
+            opciones_periodo = ["Trimestre completo", "Marzo", "Abril", "Mayo"]
+        elif trimestre_stats == "2 Trimestre":
+            opciones_periodo = ["Trimestre completo", "Junio", "Julio", "Agosto", "Septiembre"]
+        else:
+            opciones_periodo = ["Trimestre completo", "Octubre", "Noviembre", "Diciembre"]
+
         periodo = st.selectbox(
             "Ver asistencia de:",
-            ["Trimestre completo", "Marzo", "Abril", "Mayo"],
+            opciones_periodo,
             key="stats_periodo"
         )
     with col_p2:
@@ -1654,12 +1661,14 @@ elif st.session_state.accion_actual == "estadistica":
 
                         st.markdown('<div class="seccion-titulo">📋 ASISTENCIA</div>', unsafe_allow_html=True)
 
-                        if periodo == "Marzo":
-                            prefijos = ["Mar-"]
-                        elif periodo == "Abril":
-                            prefijos = ["Abr-"]
-                        elif periodo == "Mayo":
-                            prefijos = ["May-"]
+                        mapa_periodo = {
+                            "Marzo": ["Mar-"], "Abril": ["Abr-"], "Mayo": ["May-"],
+                            "Junio": ["Jun-"], "Julio": ["Jul-"], "Agosto": ["Ago-"],
+                            "Septiembre": ["Sep-"], "Octubre": ["Oct-"],
+                            "Noviembre": ["Nov-"], "Diciembre": ["Dic-"]
+                        }
+                        if periodo in mapa_periodo:
+                            prefijos = mapa_periodo[periodo]
                         else:
                             prefijos = ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"]
 
