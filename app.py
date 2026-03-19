@@ -1672,15 +1672,61 @@ elif st.session_state.accion_actual == "reporte":
                                 ausentes += 1
                     
                     if asistencia_data:
-                        df_asistencia = pd.DataFrame(asistencia_data)
-                        st.dataframe(df_asistencia, use_container_width=True)
+                        st.markdown("#### 📅 Calendario de Asistencia")
                         
+                        # Organizar por mes
+                        meses = {"Mar": [], "Abr": [], "May": []}
+                        for item in asistencia_data:
+                            fecha = item["Fecha"]
+                            for mes in meses:
+                                if fecha.startswith(mes):
+                                    dia = int(fecha.split("-")[1])
+                                    meses[mes].append((dia, item["Estado"]))
+                        
+                        nombres_meses = {"Mar": "Marzo", "Abr": "Abril", "May": "Mayo"}
+                        
+                        for mes_key, dias in meses.items():
+                            if dias:
+                                dias_sorted = sorted(dias, key=lambda x: x[0])
+                                st.markdown(f"**{nombres_meses[mes_key]}**")
+                                
+                                # Mostrar días en grilla horizontal
+                                html_dias = "<div style='display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;'>"
+                                for dia, estado in dias_sorted:
+                                    color = "#2ecc71" if estado == "Presente" else "#e74c3c"
+                                    texto = "P" if estado == "Presente" else "A"
+                                    html_dias += f"""
+                                    <div style='
+                                        background:{color};
+                                        color:white;
+                                        width:32px;height:32px;
+                                        border-radius:6px;
+                                        display:flex;align-items:center;
+                                        justify-content:center;
+                                        font-size:11px;font-weight:700;
+                                        flex-direction:column;
+                                        line-height:1;
+                                    '>
+                                        <span>{dia}</span>
+                                        <span>{texto}</span>
+                                    </div>"""
+                                html_dias += "</div>"
+                                st.markdown(html_dias, unsafe_allow_html=True)
+                        
+                        # Resumen de asistencia
                         total_dias = presentes + ausentes
                         porcentaje = (presentes / total_dias * 100) if total_dias > 0 else 0
                         nota_asistencia = calcular_nota_asistencia(presentes, total_dias)
                         
-                        st.write(f"**📊 Resumen:** {presentes} presentes, {ausentes} ausentes ({porcentaje:.1f}%)")
-                        st.write(f"**📊 Nota Asistencia:** {nota_asistencia}")
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("✅ Presentes", presentes)
+                        with col2:
+                            st.metric("❌ Ausentes", ausentes)
+                        with col3:
+                            st.metric("📊 Porcentaje", f"{porcentaje:.1f}%")
+                        with col4:
+                            st.metric("� Nota", nota_asistencia)
                     
                     st.markdown("---")
                     st.write("## 📝 Evaluaciones Detalladas")
