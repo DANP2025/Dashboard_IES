@@ -37,63 +37,54 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
     try:
         import gspread
         from google.oauth2.service_account import Credentials
+        from googleapiclient.discovery import build
 
         with st.spinner("Conectando con Google Drive..."):
 
             scope = [
-                'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive'
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
             ]
 
             creds = Credentials.from_service_account_info(CREDENTIALS, scopes=scope)
             client = gspread.authorize(creds)
 
-            # ✅ CORRECCIÓN: crear el spreadsheet directamente en tu Drive personal
-            # usando drive_id del usuario destino en vez del de la cuenta de servicio
             spreadsheet = client.create("Dashboard IES - Backup Automático")
 
-            # Compartir con tu cuenta personal con permisos de escritura
             spreadsheet.share(
-                'solpeschuk@gmail.com',
-                perm_type='user',
-                role='writer'
+                "solpeschuk@gmail.com",
+                perm_type="user",
+                role="writer"
             )
 
-            # ✅ MOVER el archivo al Drive del usuario (fuera del Drive de la cuenta de servicio)
-            import googleapiclient.discovery
-            drive_service = googleapiclient.discovery.build('drive', 'v3', credentials=creds)
+            drive_service = build("drive", "v3", credentials=creds)
 
-            # Obtener el ID del archivo
             file_id = spreadsheet.id
 
-            # Obtener los parents actuales
             file = drive_service.files().get(
                 fileId=file_id,
-                fields='parents'
+                fields="parents"
             ).execute()
 
-            previous_parents = ",".join(file.get('parents', []))
+            previous_parents = ",".join(file.get("parents", []))
 
-            # Mover el archivo: transferir ownership no es posible directamente,
-            # pero al menos lo copiamos al Drive del usuario
             drive_service.files().update(
                 fileId=file_id,
-                addParents='root',
+                addParents="root",
                 removeParents=previous_parents,
-                fields='id, parents'
+                fields="id, parents"
             ).execute()
 
             st.success("✅ Conexión exitosa con Google Drive!")
             st.info(f"📁 Spreadsheet creado: {spreadsheet.url}")
-            st.info("🎉 ¡El archivo fue movido a tu Google Drive personal!")
+            st.info("🎉 El archivo fue movido a tu Google Drive personal!")
 
-            # Datos de prueba
             test_data = pd.DataFrame({
-                'Test': ['Backup Configurado Automáticamente'],
-                'Fecha': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-                'Email': ['solpeschuk@gmail.com'],
-                'Estado': ['Activo y Funcionando'],
-                'Project_ID': [CREDENTIALS['project_id']]
+                "Test": ["Backup Configurado Automáticamente"],
+                "Fecha": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                "Email": ["solpeschuk@gmail.com"],
+                "Estado": ["Activo y Funcionando"],
+                "Project_ID": [CREDENTIALS["project_id"]]
             })
 
             try:
@@ -105,7 +96,7 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
             except Exception as ws_error:
                 try:
                     worksheet = spreadsheet.get_worksheet(0)
-                    worksheet.update('A1', [test_data.columns.tolist()] + test_data.values.tolist())
+                    worksheet.update("A1", [test_data.columns.tolist()] + test_data.values.tolist())
                     st.success("✅ Datos guardados (método alternativo)!")
                 except Exception as e2:
                     st.error(f"❌ No se pudieron guardar los datos: {e2}")
@@ -136,7 +127,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 ```
 
-Y el `requirements.txt` ahora necesita una librería más:
+Y el `requirements.txt`:
 ```
 streamlit
 gspread
