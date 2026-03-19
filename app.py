@@ -1300,10 +1300,9 @@ elif st.session_state.accion_actual == "estadistica":
                             calif = ev["Calificación"]
                             badge_class, badge_color = badges.get(calif, ("badge-b", "#4a90d9"))
                             es_asist = ev.get("es_asistencia", False)
-
                             bg_row = "rgba(26,122,74,0.08)" if es_asist else "transparent"
 
-                            col1, col2, col3 = st.columns([1, 5, 2])
+                            col1, col2, col3 = st.columns([1, 6, 2])
                             with col1:
                                 st.markdown(
                                     f"<div style='padding:8px 4px;text-align:center;"
@@ -1322,40 +1321,12 @@ elif st.session_state.accion_actual == "estadistica":
                                 )
                             with col3:
                                 st.markdown(
-                                    f"<div style='padding:8px 4px;text-align:right;"
+                                    f"<div style='padding:8px 0px;text-align:left;"
                                     f"background:{bg_row};border-radius:6px;'>"
                                     f"<span class='{badge_class}' style='font-size:13px;'>"
                                     f"{calif} ({ev['Valor']})</span></div>",
                                     unsafe_allow_html=True
                                 )
-
-                        st.markdown("<br>", unsafe_allow_html=True)
-
-                        # Métricas de evaluaciones (sin asistencia)
-                        califs_solo_eval = calificaciones_todas[1:]  # excluir asistencia
-                        promedio_eval = round(sum(califs_solo_eval) / len(califs_solo_eval), 1) if califs_solo_eval else 0
-                        max_cal = max(califs_solo_eval) if califs_solo_eval else 0
-                        min_cal = min(califs_solo_eval) if califs_solo_eval else 0
-
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.markdown(f"""<div class="stat-card">
-                                <div class="stat-title">Promedio Evaluaciones</div>
-                                <div class="stat-value">{promedio_eval}</div>
-                                <div class="stat-sub">sobre 10 puntos</div>
-                            </div>""", unsafe_allow_html=True)
-                        with col2:
-                            st.markdown(f"""<div class="stat-card">
-                                <div class="stat-title">Calificación Más Alta</div>
-                                <div class="stat-value">{max_cal}</div>
-                                <div class="stat-sub">mejor resultado</div>
-                            </div>""", unsafe_allow_html=True)
-                        with col3:
-                            st.markdown(f"""<div class="stat-card">
-                                <div class="stat-title">Calificación Más Baja</div>
-                                <div class="stat-value">{min_cal}</div>
-                                <div class="stat-sub">resultado a mejorar</div>
-                            </div>""", unsafe_allow_html=True)
 
                         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1403,14 +1374,11 @@ elif st.session_state.accion_actual == "estadistica":
                         '>
                             <div style='font-size:48px;'>{alerta_icono}</div>
                             <div>
-                                <div style='font-size:36px;font-weight:800;color:{alerta_borde};
+                                <div style='font-size:40px;font-weight:800;color:{alerta_borde};
                                 line-height:1;'>{promedio_final_trimestre}</div>
-                                <div style='font-size:15px;font-weight:600;color:#2c3e50;
-                                margin-top:4px;'>{alerta_texto}</div>
-                                <div style='font-size:11px;color:#7f8c8d;margin-top:4px;'>
+                                <div style='font-size:11px;color:#7f8c8d;margin-top:6px;'>
                                     Promedio de {len(calificaciones_todas)} evaluaciones 
-                                    incluyendo asistencia ({nota_asistencia}) + 
-                                    evaluaciones ({promedio_eval})
+                                    incluyendo asistencia
                                 </div>
                             </div>
                         </div>
