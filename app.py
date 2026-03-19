@@ -47,20 +47,6 @@ st.sidebar.markdown("---")
 # ACCIONES EN SIDEBAR
 st.sidebar.subheader("✅ Acciones Rápidas")
 
-# Sección de Asistencia en Sidebar
-st.sidebar.markdown("### 📋 Marcar Asistencia")
-with st.sidebar.form("asistencia_sidebar"):
-    asistencia_alumno = st.selectbox("👤 Alumno:", ["Ana García", "Carlos López", "María Rodríguez", "Juan Martínez", "Laura Sánchez", "Pedro Fernández", "Sofía Martínez", "Lucas González"], key="asistencia_alumno_sidebar")
-    asistencia_fecha = st.date_input("📅 Fecha:", value=datetime.now().date(), key="asistencia_fecha_sidebar")
-    asistencia_estado = st.selectbox("📊 Estado:", ["Presente", "Ausente"], key="asistencia_estado_sidebar")
-    
-    if st.form_submit_button("✅ Marcar Asistencia", type="primary"):
-        st.sidebar.success(f"✅ Asistencia marcada para {asistencia_alumno}")
-        st.sidebar.info(f"📅 {asistencia_fecha} - {asistencia_estado}")
-
-# Separador
-st.sidebar.markdown("---")
-
 # Sección de Evaluaciones en Sidebar
 st.sidebar.markdown("### 📝 Agregar Evaluación")
 with st.sidebar.form("evaluacion_sidebar"):
@@ -80,11 +66,11 @@ st.sidebar.markdown("---")
 if st.sidebar.button("🗑️ Limpiar Datos de Ejemplo", type="secondary", help="Elimina todos los datos de ejemplo para empezar con datos reales"):
     st.sidebar.warning("⚠️ Esta función eliminará todos los datos de ejemplo")
 
-# Sistema de navegación por pestañas principales - CORREGIDO: 3 pestañas en lugar de 4
+# Sistema de navegación por pestañas principales
 tab1, tab2, tab3 = st.tabs([
     "📊 Dashboard General", 
     "👥 Gestión de Alumnos", 
-    "📈 Reportes y Estadísticas"
+    "📋 Asistencia Interactiva"
 ])
 
 # Función para crear/leer Excel
@@ -412,121 +398,166 @@ with tab2:
         st.error(f"Error leyendo datos: {e}")
         st.info("📊 Haz clic en 'Agregar Datos de Ejemplo' para probar el sistema")
 
-# ==================== TAB 3: REPORTES Y ESTADÍSTICAS ====================
+# ==================== TAB 3: ASISTENCIA INTERACTIVA ====================
 with tab3:
-    st.header("📈 Reportes y Estadísticas")
+    st.header("📋 Asistencia Interactiva")
     
-    # Seleccionar trimestre para reportes
-    trimestre_reporte = st.selectbox("📅 Seleccionar Trimestre para Reporte:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="reporte_trimestre")
+    # Seleccionar fecha y curso
+    col1, col2, col3 = st.columns(3)
     
+    with col1:
+        fecha_asistencia = st.date_input("📅 Fecha de Asistencia:", value=datetime.now().date(), key="fecha_asistencia_interactiva")
+    
+    with col2:
+        curso_asistencia = st.selectbox("📂 Curso:", ["Todos", "EF 1A", "EF 2A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="curso_asistencia_interactiva")
+    
+    with col3:
+        trimestre_asistencia = st.selectbox("📅 Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="trimestre_asistencia_interactiva")
+    
+    st.markdown("---")
+    
+    # Leer datos del Excel
     try:
-        df_reporte = pd.read_excel(archivo_excel, sheet_name=trimestre_reporte)
+        df_asistencia = pd.read_excel(archivo_excel, sheet_name=trimestre_asistencia)
         
-        if not df_reporte.empty:
-            # Estadísticas de asistencia
-            st.subheader("📊 Estadísticas de Asistencia")
+        # Aplicar filtros
+        if curso_asistencia != "Todos":
+            df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
+        
+        if not df_asistencia.empty:
+            # Obtener la columna de fecha actual
+            fecha_str = fecha_asistencia.strftime("%b-%d")
             
-            col1, col2, col3, col4 = st.columns(4)
-            
-            # Calcular estadísticas generales
-            columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-            total_presentes = 0
-            total_ausentes = 0
-            total_dias = 0
-            
-            for idx, row in df_reporte.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    for col in columnas_asistencia:
-                        if pd.notna(row[col]):
-                            total_dias += 1
-                            if row[col] == "Presente":
-                                total_presentes += 1
+            # Verificar si la columna existe
+            if fecha_str in df_asistencia.columns:
+                st.subheader(f"📋 Asistencia del día {fecha_str}")
+                
+                # Crear tabla interactiva
+                st.write("Haz clic en los casilleros para marcar asistencia:")
+                
+                # Crear una copia para modificar
+                df_modificable = df_asistencia.copy()
+                
+                # Inicializar session state para almacenar cambios
+                if 'asistencia_temporal' not in st.session_state:
+                    st.session_state.asistencia_temporal = {}
+                
+                # Crear tabla con checkboxes
+                for idx, row in df_modificable.iterrows():
+                    if pd.notna(row["Apellido y Nombre"]):
+                        col1, col2, col3 = st.columns([3, 1, 1])
+                        
+                        with col1:
+                            st.write(f"**{row['Apellido y Nombre']}** ({row['Curso']})")
+                        
+                        with col2:
+                            # Obtener estado actual
+                            estado_actual = row[fecha_str] if pd.notna(row[fecha_str]) else "Ausente"
+                            
+                            # Crear checkbox para cambiar estado
+                            presente = st.checkbox(
+                                "✅", 
+                                value=(estado_actual == "Presente"),
+                                key=f"asistencia_{idx}_{fecha_str}",
+                                help="Marcar como Presente"
+                            )
+                            
+                            # Guardar en session state
+                            st.session_state.asistencia_temporal[f"{idx}_{fecha_str}"] = presente
+                        
+                        with col3:
+                            if not presente:
+                                st.write("❌ Ausente")
                             else:
-                                total_ausentes += 1
-            
-            porcentaje_general = (total_presentes / total_dias * 100) if total_dias > 0 else 0
-            
-            with col1:
-                st.metric("👥 Total Alumnos", len(df_reporte))
-            
-            with col2:
-                st.metric("📊 % Asistencia General", f"{porcentaje_general:.1f}%")
-            
-            with col3:
-                st.metric("✅ Total Presentes", total_presentes)
-            
-            with col4:
-                st.metric("❌ Total Ausentes", total_ausentes)
-            
-            # Distribución de calificaciones
-            st.markdown("---")
-            st.subheader("📈 Distribución de Calificaciones")
-            
-            # Contar calificaciones
-            conteo_calificaciones = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
-            
-            for idx, row in df_reporte.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    for i in range(1, 7):
-                        calif_col = f"Calif {i}"
-                        if pd.notna(row[calif_col]):
-                            calif = str(row[calif_col]).upper().strip()
-                            if calif in conteo_calificaciones:
-                                conteo_calificaciones[calif] += 1
-            
-            # Mostrar gráfico de barras
-            if sum(conteo_calificaciones.values()) > 0:
-                calif_df = pd.DataFrame(list(conteo_calificaciones.items()), columns=["Calificación", "Cantidad"])
-                st.bar_chart(calif_df, x="Calificación", y="Cantidad")
-            
-            # Tabla detallada
-            st.markdown("---")
-            st.subheader("📋 Reporte Detallado")
-            
-            # Preparar datos detallados
-            reporte_data = []
-            
-            for idx, row in df_reporte.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    # Calcular asistencia
-                    columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                    presentes = 0
-                    totales = 0
+                                st.write("✅ Presente")
+                
+                # Botón para guardar cambios
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("💾 Guardar Asistencia", type="primary", key="guardar_asistencia_interactiva"):
+                        # Aplicar cambios al DataFrame
+                        for key, presente in st.session_state.asistencia_temporal.items():
+                            if fecha_str in key:
+                                idx = int(key.split("_")[0])
+                                df_modificable.at[idx, fecha_str] = "Presente" if presente else "Ausente"
+                        
+                        # Guardar en Excel
+                        try:
+                            with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                                df_modificable.to_excel(writer, sheet_name=trimestre_asistencia, index=False)
+                            
+                            st.success("✅ Asistencia guardada exitosamente!")
+                            st.balloons()
+                            
+                            # Limpiar session state
+                            st.session_state.asistencia_temporal = {}
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error guardando asistencia: {e}")
+                
+                with col2:
+                    if st.button("🔄 Recargar Datos", type="secondary", key="recargar_asistencia"):
+                        st.session_state.asistencia_temporal = {}
+                        st.rerun()
+                
+                with col3:
+                    # Calcular estadísticas del día
+                    presentes_dia = 0
+                    total_dia = 0
                     
-                    for col in columnas_asistencia:
-                        if pd.notna(row[col]):
-                            totales += 1
-                            if row[col] == "Presente":
-                                presentes += 1
+                    for idx, row in df_modificable.iterrows():
+                        if pd.notna(row["Apellido y Nombre"]):
+                            total_dia += 1
+                            if row[fecha_str] == "Presente":
+                                presentes_dia += 1
                     
-                    porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
-                    nota_asistencia = calcular_nota_asistencia(presentes, totales)
+                    if total_dia > 0:
+                        porcentaje_dia = (presentes_dia / total_dia) * 100
+                        st.metric(f"📊 {fecha_str}", f"{presentes_dia}/{total_dia}", f"{porcentaje_dia:.1f}%")
+                
+                # Mostrar tabla actual
+                st.markdown("---")
+                st.subheader("📋 Vista Previa de Asistencia")
+                
+                # Preparar datos para mostrar
+                display_asistencia = []
+                for idx, row in df_modificable.iterrows():
+                    if pd.notna(row["Apellido y Nombre"]):
+                        display_asistencia.append({
+                            "Alumno": row["Apellido y Nombre"],
+                            "Curso": row["Curso"],
+                            "Estado": row[fecha_str] if pd.notna(row[fecha_str]) else "Sin marcar"
+                        })
+                
+                if display_asistencia:
+                    df_display_asistencia = pd.DataFrame(display_asistencia)
                     
-                    # Obtener evaluaciones
-                    evaluaciones_info = []
-                    for i in range(1, 7):
-                        eval_col = f"Eval {i}"
-                        calif_col = f"Calif {i}"
-                        if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
-                            evaluaciones_info.append(f"{row[eval_col]}: {row[calif_col]}")
+                    # Colorear según estado
+                    def color_estado(val):
+                        if val == "Presente":
+                            return 'background-color: #d4edda; color: #155724'
+                        elif val == "Ausente":
+                            return 'background-color: #f8d7da; color: #721c24'
+                        else:
+                            return 'background-color: #fff3cd; color: #856404'
                     
-                    reporte_data.append({
-                        "Alumno": row["Apellido y Nombre"],
-                        "Curso": row["Curso"],
-                        "% Asistencia": f"{porcentaje_asistencia:.1f}%",
-                        "Nota Asistencia": nota_asistencia,
-                        "Evaluaciones": " | ".join(evaluaciones_info),
-                        "Observaciones": row.get("Observaciones", "")
-                    })
-            
-            df_reporte_final = pd.DataFrame(reporte_data)
-            st.dataframe(df_reporte_final, use_container_width=True)
-            
+                    st.dataframe(
+                        df_display_asistencia.style.applymap(color_estado, subset=['Estado']),
+                        use_container_width=True
+                    )
+                
+            else:
+                st.warning(f"⚠️ La columna para la fecha {fecha_str} no existe en el Excel")
+                st.info("💡 Las fechas disponibles son: Mar-01, Mar-02, ..., May-31")
+                
         else:
-            st.info("📋 No hay datos para mostrar en este trimestre")
+            st.info("📋 No hay alumnos para mostrar con los filtros seleccionados")
             
     except Exception as e:
-        st.error(f"Error generando reporte: {e}")
+        st.error(f"Error cargando datos de asistencia: {e}")
         st.info("📊 Haz clic en 'Agregar Datos de Ejemplo' para probar el sistema")
 
 # Información del sistema
@@ -557,8 +588,8 @@ st.markdown("""
     <h2 style='color: white; margin-bottom: 10px;'>📚 Sistema de Gestión Educativa</h2>
     <p style='color: white; font-size: 16px; margin: 5px 0;'>
         <span style='color: #4CAF50;'>✅</span> Gestión completa con sidebar<br>
-        <span style='color: #4CAF50;'>📋</span> Asistencia y evaluaciones rápidas<br>
-        <span style='color: #4CAF50;'>📊</span> Reportes y estadísticas<br>
+        <span style='color: #4CAF50;'>📋</span> Asistencia interactiva con checkboxes<br>
+        <span style='color: #4CAF50;'>📊</span> Evaluaciones rápidas<br>
         <span style='color: #4CAF50;'>📁</span> Excel local con datos reales
     </p>
     <small style='color: rgba(255,255,255,0.8);'>Sistema educativo profesional y funcional</small>
