@@ -581,55 +581,60 @@ elif st.session_state.accion_actual == "evaluaciones":
                 if pd.notna(row["Apellido y Nombre"]):
                     st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
+                    # Encabezado visual
+                    col_h1, col_h2, col_h3, col_h4 = st.columns([1, 3, 2, 1])
+                    with col_h1:
+                        st.caption("Nro.")
+                    with col_h2:
+                        st.caption("Nombre de la evaluación")
+                    with col_h3:
+                        st.caption("Calificación")
+                    with col_h4:
+                        st.caption("Estado")
+                    
                     for j in range(1, 7):
                         eval_col = f"Eval {j}"
                         calif_col = f"Calif {j}"
                         
                         if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
-                            # Layout claro y profesional
-                            st.markdown("---")
-                            col1, col2, col3 = st.columns([2, 3, 2])
-                            
+                            col1, col2, col3, col4 = st.columns([1, 3, 2, 1])
+
                             with col1:
-                                st.write("**📋 Tipo de Evaluación**")
-                                tipo_eval = row.get('Tipo Evaluación', 'Diagnóstico')
-                                st.write(f"**{tipo_eval}**")
-                            
+                                tipo_eval = str(row.get('Tipo Evaluación', 'Diagnóstico'))
+                                st.markdown(f"**Eval {j}**")
+                                st.caption(tipo_eval)
+
                             with col2:
-                                st.write("**📝 Nombre de la Evaluación**")
                                 nombre_eval_actual = st.text_input(
-                                    "Nombre:", 
-                                    value=row.get(eval_col, f"Evaluación {j}"),
+                                    f"Nombre evaluación {j}",
+                                    value=str(row.get(eval_col, f"Evaluación {j}")),
                                     key=f"eval_nombre_{idx}_{j}",
-                                    help="Ingresa el nombre de la evaluación"
+                                    label_visibility="collapsed"
                                 )
-                                st.write(f"**{nombre_eval_actual}**")
-                            
+
                             with col3:
-                                st.write("**⭐ Calificación**")
-                                calificacion_actual = row.get(calif_col, "B")
+                                calificacion_actual = str(row.get(calif_col, "B"))
+                                opciones_calif = ["M", "R-", "R+", "B", "MB", "EX"]
+                                idx_cal = opciones_calif.index(calificacion_actual) if calificacion_actual in opciones_calif else 3
                                 calificacion = st.selectbox(
-                                    "Calif:", 
-                                    ["M", "R-", "R+", "B", "MB", "EX"],
-                                    index=["M", "R-", "R+", "B", "MB", "EX"].index(calificacion_actual) if calificacion_actual in ["M", "R-", "R+", "B", "MB", "EX"] else 3,
+                                    f"Calificación {j}",
+                                    opciones_calif,
+                                    index=idx_cal,
                                     key=f"eval_calif_{idx}_{j}",
-                                    help="Seleccionar calificación"
+                                    label_visibility="collapsed"
                                 )
-                                
-                                # Mostrar calificación con color
-                                if calificacion == "EX":
-                                    st.success("🌟 EXCELENTE")
-                                elif calificacion == "MB":
-                                    st.success("✅ MUY BUENO")
-                                elif calificacion == "B":
-                                    st.info("✅ BUENO")
-                                elif calificacion == "R+":
-                                    st.warning("⚠️ REGULAR+")
-                                elif calificacion == "R-":
-                                    st.error("❌ REGULAR-")
-                                else:
-                                    st.error("💔 INSUFICIENTE")
-                            
+
+                            with col4:
+                                iconos_calif = {
+                                    "EX": "🌟",
+                                    "MB": "✅",
+                                    "B": "🔵",
+                                    "R+": "⚠️",
+                                    "R-": "🔴",
+                                    "M": "💔"
+                                }
+                                st.markdown(f"### {iconos_calif.get(calificacion, '❓')}")
+
                             st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
                                 "nombre": nombre_eval_actual,
                                 "calificacion": calificacion
