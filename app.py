@@ -700,26 +700,64 @@ elif st.session_state.accion_actual == "asistencia":
             st.session_state.asistencia_cambios = {}
 
         for idx, row in df_asistencia.iterrows():
-            if pd.notna(row["Apellido y Nombre"]):
-                col1, col2, col3 = st.columns([4, 1, 1])
-                with col1:
-                    st.write(f"**{row['Apellido y Nombre']}** — 📂 {row['Curso']}")
-                with col2:
-                    estado_actual = row.get(fecha_str, "Ausente")
-                    if pd.isna(estado_actual):
-                        estado_actual = "Ausente"
-                    presente = st.checkbox(
-                        "✅",
-                        value=(estado_actual == "Presente"),
-                        key=f"asistencia_{idx}_{fecha_str}",
-                        help="Marcar como Presente"
-                    )
-                    st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = presente
-                with col3:
-                    if presente:
-                        st.success("✅ Presente")
-                    else:
-                        st.error("❌ Ausente")
+            if pd.notna(row.get("Apellido y Nombre")):
+                key_estado = f"asistencia_{idx}_{fecha_str}"
+                
+                # Estado actual del alumno para este día
+                estado_guardado = row.get(fecha_str, "Ausente")
+                if pd.isna(estado_guardado):
+                    estado_guardado = "Ausente"
+                
+                # Usar session_state si ya fue tocado, sino usar el guardado
+                if key_estado not in st.session_state:
+                    st.session_state[key_estado] = (estado_guardado == "Presente")
+                
+                es_presente = st.session_state[key_estado]
+                
+                # Color de fondo según estado
+                color_fondo = "rgba(46,204,113,0.12)" if es_presente else "rgba(231,76,60,0.08)"
+                color_borde = "#2ecc71" if es_presente else "#e74c3c"
+                
+                st.markdown(f"""
+                <div style='
+                    background:{color_fondo};
+                    border-left: 4px solid {color_borde};
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    margin: 4px 0;
+                '>
+                    <span style='font-weight:600;font-size:15px;color:#2c3e50;'>
+                        {row['Apellido y Nombre']}
+                    </span>
+                    <span style='font-size:12px;color:#7f8c8d;margin-left:8px;'>
+                        📂 {row['Curso']}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                col_p, col_a = st.columns(2)
+                with col_p:
+                    if st.button(
+                        "✅  PRESENTE",
+                        key=f"btn_presente_{idx}_{fecha_str}",
+                        type="primary" if es_presente else "secondary",
+                        use_container_width=True
+                    ):
+                        st.session_state[key_estado] = True
+                        st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = True
+                        st.rerun()
+                with col_a:
+                    if st.button(
+                        "❌  AUSENTE",
+                        key=f"btn_ausente_{idx}_{fecha_str}",
+                        type="primary" if not es_presente else "secondary",
+                        use_container_width=True
+                    ):
+                        st.session_state[key_estado] = False
+                        st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = False
+                        st.rerun()
+                
+                st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = es_presente
 
         st.markdown("---")
         col1, col2 = st.columns(2)
