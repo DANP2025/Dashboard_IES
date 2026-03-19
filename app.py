@@ -493,6 +493,8 @@ if 'accion_actual' not in st.session_state:
 if 'nuevas_evaluaciones' not in st.session_state:
     st.session_state.nuevas_evaluaciones = []
 
+archivo_excel = crear_excel_si_no_existe()
+
 # Sidebar con botones de navegación
 st.sidebar.markdown("# 📚 Sistema Educativo")
 st.sidebar.markdown("---")
@@ -529,14 +531,6 @@ if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backu
                 st.sidebar.success(f"✅ Google Sheets: {mensaje}")
             else:
                 st.sidebar.error(f"❌ Google Sheets: {mensaje}")
-
-# Inicializar estado
-if 'accion_actual' not in st.session_state:
-    st.session_state.accion_actual = "dashboard"
-if 'nuevas_evaluaciones' not in st.session_state:
-    st.session_state.nuevas_evaluaciones = []
-
-archivo_excel = crear_excel_si_no_existe()
 
 # Restaurar desde Google Sheets si Streamlit reinició y perdió los datos
 if GOOGLE_SHEETS_DISPONIBLE:
