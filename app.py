@@ -685,7 +685,14 @@ elif st.session_state.accion_actual == "asistencia":
             df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
         
         if not df_asistencia.empty:
-            fecha_str = fecha_seleccionada.strftime("%b-%d")
+            meses_es = {
+                "Jan": "Jan", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
+                "May": "May", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
+                "Sep": "Sep", "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
+            }
+            mes_en = fecha_seleccionada.strftime("%b")
+            mes = meses_es.get(mes_en, mes_en)
+            fecha_str = f"{mes}-{fecha_seleccionada.strftime('%d')}"
             
             if fecha_str not in df_asistencia.columns:
                 df_asistencia[fecha_str] = "Ausente"
@@ -697,6 +704,23 @@ elif st.session_state.accion_actual == "asistencia":
             
             for idx, row in df_asistencia.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
+                    st.markdown(f"### 📅 Asistencia del día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
+                    
+                    col_res1, col_res2, col_res3 = st.columns(3)
+                    presentes_hoy = sum(
+                        1 for idx, row in df_asistencia.iterrows()
+                        if pd.notna(row.get("Apellido y Nombre")) and
+                        row.get(fecha_seleccionada.strftime("%b-%d"), "Ausente") == "Presente"
+                    )
+                    total_hoy = sum(1 for idx, row in df_asistencia.iterrows() if pd.notna(row.get("Apellido y Nombre")))
+                    with col_res1:
+                        st.metric("✅ Presentes", presentes_hoy)
+                    with col_res2:
+                        st.metric("❌ Ausentes", total_hoy - presentes_hoy)
+                    with col_res3:
+                        st.metric("📊 Total", total_hoy)
+                    st.markdown("---")
+                    
                     col1, col2, col3 = st.columns([3, 1, 1])
                     
                     with col1:
@@ -713,15 +737,17 @@ elif st.session_state.accion_actual == "asistencia":
                             help="Marcar como Presente"
                         )
                         
-                        st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = presente
+                        if presente != (estado_actual == "Presente"):
+                            st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = "Presente" if presente else "Ausente"
                     
                     with col3:
-                        if presente:
-                            st.success("✅ Presente")
+                        if pd.notna(row[fecha_str]):
+                            if row[fecha_str] == "Presente":
+                                st.success("✅ Presente")
+                            else:
+                                st.error("❌ Ausente")
                         else:
-                            st.error("❌ Ausente")
-                    
-                    st.markdown("---")
+                            st.warning("⚠️ Sin dato")
             
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -779,11 +805,25 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.header("📝 Gestión de Evaluaciones")
     st.markdown("---")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        curso_eval = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="eval_curso")
+        curso_eval = st.selectbox(
+            "📂 Seleccionar Curso:",
+            ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"],
+            key="eval_curso"
+        )
     with col2:
-        trimestre_eval = st.selectbox("📅 Seleccionar Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="eval_trimestre")
+        trimestre_eval = st.selectbox(
+            "📅 Seleccionar Trimestre:",
+            ["1 Trimestre", "2 Trimestre", "3 Trimestre"],
+            key="eval_trimestre"
+        )
+    with col3:
+        fecha_evaluacion = st.date_input(
+            "📅 Fecha de Evaluación:",
+            value=datetime.now().date(),
+            key="eval_fecha"
+        )
     
     st.markdown("---")
     
@@ -863,7 +903,7 @@ elif st.session_state.accion_actual == "evaluaciones":
                         calif_col = f"Calif {j}"
                         
                         if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
-                            col1, col2, col3, col4 = st.columns([1, 3, 2, 1])
+                            col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
 
                             with col1:
                                 tipo_eval = str(row.get('Tipo Evaluación', 'Diagnóstico'))
@@ -891,14 +931,10 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 )
 
                             with col4:
-                                iconos_calif = {
-                                    "EX": "🌟",
-                                    "MB": "✅",
-                                    "B": "🔵",
-                                    "R+": "⚠️",
-                                    "R-": "🔴",
-                                    "M": "💔"
-                                }
+                                st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
+
+                            with col5:
+                                iconos_calif = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
                                 st.markdown(f"### {iconos_calif.get(calificacion, '❓')}")
 
                             st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
