@@ -620,9 +620,7 @@ elif st.session_state.accion_actual == "asistencia":
     st.subheader("📋 Registro de Asistencia - Marcar Rápidamente")
     
     try:
-        # Intentar leer desde Excel local
         df_asistencia = pd.read_excel(archivo_excel, sheet_name=trimestre_asistencia)
-        # Si está vacío, intentar desde Sheets
         if df_asistencia.empty and GOOGLE_SHEETS_DISPONIBLE:
             df_sheets = cargar_datos_desde_sheets(trimestre_asistencia)
             if df_sheets is not None and not df_sheets.empty:
@@ -634,108 +632,108 @@ elif st.session_state.accion_actual == "asistencia":
             df_sheets = cargar_datos_desde_sheets(trimestre_asistencia)
             if df_sheets is not None and not df_sheets.empty:
                 df_asistencia = df_sheets
-        
-        if curso_asistencia != "Todos":
-            df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
-        
-        if not df_asistencia.empty:
-            meses_es = {
-                "Jan": "Jan", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
-                "May": "May", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
-                "Sep": "Sep", "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
-            }
-            mes_en = fecha_seleccionada.strftime("%b")
-            mes = meses_es.get(mes_en, mes_en)
-            fecha_str = f"{mes}-{fecha_seleccionada.strftime('%d')}"
-            
-            if fecha_str not in df_asistencia.columns:
-                df_asistencia[fecha_str] = "Ausente"
-            
-            st.write("✅ Marca la casilla para **Presente** - ❌ Casilla sin marcar = **Ausente**")
-            
-            if 'asistencia_cambios' not in st.session_state:
-                st.session_state.asistencia_cambios = {}
-            
-            for idx, row in df_asistencia.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
-                    
-                    col1, col2, col3 = st.columns([3, 1, 1])
-                    
-                    with col1:
-                        st.write(f"**{row['Apellido y Nombre']}**")
-                        st.write(f"📂 {row['Curso']}")
-                    
-                    with col2:
-                        estado_actual = row[fecha_str] if pd.notna(row[fecha_str]) else "Ausente"
-                        
-                        presente = st.checkbox(
-                            "✅", 
-                            value=(estado_actual == "Presente"),
-                            key=f"asistencia_{idx}_{fecha_str}",
-                            help="Marcar como Presente"
-                        )
-                        
-                        if presente != (estado_actual == "Presente"):
-                            st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = "Presente" if presente else "Ausente"
-                    
-                    with col3:
-                        if pd.notna(row[fecha_str]):
-                            if row[fecha_str] == "Presente":
-                                st.success("✅ Presente")
-                            else:
-                                st.error("❌ Ausente")
+
+    if curso_asistencia != "Todos":
+        df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
+
+    if not df_asistencia.empty:
+        meses_es = {
+            "Jan": "Jan", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
+            "May": "May", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
+            "Sep": "Sep", "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
+        }
+        mes_en = fecha_seleccionada.strftime("%b")
+        mes = meses_es.get(mes_en, mes_en)
+        fecha_str = f"{mes}-{fecha_seleccionada.strftime('%d')}"
+
+        if fecha_str not in df_asistencia.columns:
+            df_asistencia[fecha_str] = "Ausente"
+
+        # Resumen del día
+        st.markdown(f"### 📅 Asistencia del día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
+        presentes_hoy = sum(
+            1 for _, r in df_asistencia.iterrows()
+            if pd.notna(r.get("Apellido y Nombre")) and r.get(fecha_str, "Ausente") == "Presente"
+        )
+        total_hoy = sum(1 for _, r in df_asistencia.iterrows() if pd.notna(r.get("Apellido y Nombre")))
+        col_r1, col_r2, col_r3 = st.columns(3)
+        with col_r1:
+            st.metric("✅ Presentes", presentes_hoy)
+        with col_r2:
+            st.metric("❌ Ausentes", total_hoy - presentes_hoy)
+        with col_r3:
+            st.metric("📊 Total", total_hoy)
+        st.markdown("---")
+
+        st.write("✅ Marcá la casilla para **Presente** — sin marcar = **Ausente**")
+
+        if 'asistencia_cambios' not in st.session_state:
+            st.session_state.asistencia_cambios = {}
+
+        for idx, row in df_asistencia.iterrows():
+            if pd.notna(row["Apellido y Nombre"]):
+                col1, col2, col3 = st.columns([4, 1, 1])
+                with col1:
+                    st.write(f"**{row['Apellido y Nombre']}** — 📂 {row['Curso']}")
+                with col2:
+                    estado_actual = row.get(fecha_str, "Ausente")
+                    if pd.isna(estado_actual):
+                        estado_actual = "Ausente"
+                    presente = st.checkbox(
+                        "✅",
+                        value=(estado_actual == "Presente"),
+                        key=f"asistencia_{idx}_{fecha_str}",
+                        help="Marcar como Presente"
+                    )
+                    st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = presente
+                with col3:
+                    if presente:
+                        st.success("✅")
+                    else:
+                        st.error("❌")
+
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Guardar Asistencia", type="primary", key="guardar_todos_asistencia"):
+                with st.spinner("Guardando asistencia..."):
+                    try:
+                        cambios_guardados = 0
+                        for key, presente in st.session_state.asistencia_cambios.items():
+                            if fecha_str in key:
+                                idx = int(key.split("_")[0])
+                                df_asistencia.at[idx, fecha_str] = "Presente" if presente else "Ausente"
+                                cambios_guardados += 1
+
+                        columnas_asist = [c for c in df_asistencia.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                        for idx, row in df_asistencia.iterrows():
+                            if pd.notna(row.get("Apellido y Nombre")):
+                                p = sum(1 for c in columnas_asist if pd.notna(row.get(c)) and row.get(c) == "Presente")
+                                t = sum(1 for c in columnas_asist if pd.notna(row.get(c)))
+                                df_asistencia.at[idx, "Nota Asistencia"] = calcular_nota_asistencia(p, t)
+
+                        if guardar_datos_excel(df_asistencia, trimestre_asistencia, archivo_excel):
+                            st.success(f"✅ Asistencia del {fecha_seleccionada.strftime('%d/%m/%Y')} guardada — {cambios_guardados} registros")
+                            st.session_state.asistencia_cambios = {}
                         else:
-                            st.warning("⚠️ Sin dato")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("💾 Guardar Asistencia", type="primary", key="guardar_todos_asistencia"):
-                    with st.spinner("Guardando asistencia..."):
-                        try:
-                            cambios_guardados = 0
-                            for key, presente in st.session_state.asistencia_cambios.items():
-                                if fecha_str in key:
-                                    idx = int(key.split("_")[0])
-                                    df_asistencia.at[idx, fecha_str] = "Presente" if presente else "Ausente"
-                                    cambios_guardados += 1
+                            st.error("❌ Error guardando Excel local")
+                            st.stop()
 
-                            # Recalcular nota asistencia
-                            columnas_asistencia = [col for col in df_asistencia.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                            for idx, row in df_asistencia.iterrows():
-                                if pd.notna(row["Apellido y Nombre"]):
-                                    presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                                    totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                                    df_asistencia.at[idx, "Nota Asistencia"] = calcular_nota_asistencia(presentes, totales)
-
-                            # Guardar Excel local
-                            if guardar_datos_excel(df_asistencia, trimestre_asistencia, archivo_excel):
-                                st.success(f"✅ Asistencia del {fecha_seleccionada.strftime('%d/%m/%Y')} guardada — {cambios_guardados} registros")
-                                st.session_state.asistencia_cambios = {}
+                        with st.spinner("Sincronizando con Google Sheets..."):
+                            ok, mensaje = sincronizar_google_sheets()
+                            if ok:
+                                st.success("✅ Google Sheets actualizado!")
                             else:
-                                st.error("❌ Error guardando Excel local")
-                                st.stop()
-
-                            # Sincronizar con Google Sheets
-                            with st.spinner("Sincronizando con Google Sheets..."):
-                                ok, mensaje = sincronizar_google_sheets()
-                                if ok:
-                                    st.success("✅ Google Sheets actualizado!")
-                                else:
-                                    st.warning(f"⚠️ Excel guardado pero Sheets falló: {mensaje}")
-
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error: {e}")
-            with col2:
-                if st.button("🔄 Recargar Datos", type="secondary", key="recargar_asistencia"):
-                    st.session_state.asistencia_cambios = {}
-                    st.rerun()
-            with col3:
-                st.write("")
-    except Exception as e:
-        st.error(f"Error: {e}")
-        st.info("📊 Agrega datos simulados para probar")
+                                st.warning(f"⚠️ Excel guardado pero Sheets falló: {mensaje}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+        with col2:
+            if st.button("🔄 Recargar", type="secondary", key="recargar_asistencia"):
+                st.session_state.asistencia_cambios = {}
+                st.rerun()
+    else:
+        st.info("📋 No hay alumnos para mostrar. Primero agregá datos simulados desde el Dashboard.")
 
 elif st.session_state.accion_actual == "evaluaciones":
     st.header("📝 Gestión de Evaluaciones")
