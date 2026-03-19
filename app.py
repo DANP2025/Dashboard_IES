@@ -1258,8 +1258,19 @@ elif st.session_state.accion_actual == "estadistica":
                     st.markdown('<div class="seccion-titulo">📝 EVALUACIONES</div>', unsafe_allow_html=True)
 
                     evaluaciones_detalle = []
-                    calificaciones = []
+                    calificaciones_todas = []
 
+                    # Primero agregar ASISTENCIA como evaluación más
+                    evaluaciones_detalle.append({
+                        "N°": "A",
+                        "Evaluación": "Asistencia al Trimestre",
+                        "Calificación": "EX" if nota_asistencia == 10 else ("B" if nota_asistencia == 8 else "M"),
+                        "Valor": nota_asistencia,
+                        "es_asistencia": True
+                    })
+                    calificaciones_todas.append(nota_asistencia)
+
+                    # Luego agregar las evaluaciones normales
                     for i in range(1, 7):
                         eval_col = f"Eval {i}"
                         calif_col = f"Calif {i}"
@@ -1270,54 +1281,67 @@ elif st.session_state.accion_actual == "estadistica":
                                 "N°": i,
                                 "Evaluación": str(row.get(eval_col)),
                                 "Calificación": calif_val,
-                                "Valor": calif_num
+                                "Valor": calif_num,
+                                "es_asistencia": False
                             })
-                            calificaciones.append(calif_num)
+                            calificaciones_todas.append(calif_num)
 
                     if evaluaciones_detalle:
-                        # Tabla estilizada
+                        badges = {
+                            "EX": ("badge-ex", "#1a7a4a"),
+                            "MB": ("badge-mb", "#2d6a9f"),
+                            "B":  ("badge-b",  "#4a90d9"),
+                            "R+": ("badge-rp", "#e8a020"),
+                            "R-": ("badge-rm", "#d4601a"),
+                            "M":  ("badge-m",  "#c0392b")
+                        }
+
                         for ev in evaluaciones_detalle:
                             calif = ev["Calificación"]
-                            badges = {
-                                "EX": "badge-ex", "MB": "badge-mb",
-                                "B": "badge-b", "R+": "badge-rp",
-                                "R-": "badge-rm", "M": "badge-m"
-                            }
-                            badge_class = badges.get(calif, "badge-b")
-                            col1, col2, col3 = st.columns([1, 5, 3])
+                            badge_class, badge_color = badges.get(calif, ("badge-b", "#4a90d9"))
+                            es_asist = ev.get("es_asistencia", False)
+
+                            bg_row = "rgba(26,122,74,0.08)" if es_asist else "transparent"
+
+                            col1, col2, col3 = st.columns([1, 5, 2])
                             with col1:
                                 st.markdown(
-                                    f"<div style='padding:6px 4px;text-align:center;"
-                                    f"font-weight:700;color:#1e3a5f;font-size:14px;'>"
-                                    f"#{ev['N°']}</div>",
+                                    f"<div style='padding:8px 4px;text-align:center;"
+                                    f"font-weight:700;color:#1e3a5f;font-size:14px;"
+                                    f"background:{bg_row};border-radius:6px;'>#{ev['N°']}</div>",
                                     unsafe_allow_html=True
                                 )
                             with col2:
+                                icono = "📋 " if es_asist else ""
                                 st.markdown(
-                                    f"<div style='padding:6px 4px;color:#2c3e50;"
-                                    f"font-size:14px;line-height:1.4;'>"
-                                    f"{ev['Evaluación']}</div>",
+                                    f"<div style='padding:8px 4px;color:#2c3e50;"
+                                    f"font-size:14px;font-weight:{'600' if es_asist else '400'};"
+                                    f"background:{bg_row};border-radius:6px;'>"
+                                    f"{icono}{ev['Evaluación']}</div>",
                                     unsafe_allow_html=True
                                 )
                             with col3:
                                 st.markdown(
-                                    f"<div style='padding:6px 4px;'>"
-                                    f"<span class='{badge_class}'>"
+                                    f"<div style='padding:8px 4px;text-align:right;"
+                                    f"background:{bg_row};border-radius:6px;'>"
+                                    f"<span class='{badge_class}' style='font-size:13px;'>"
                                     f"{calif} ({ev['Valor']})</span></div>",
                                     unsafe_allow_html=True
                                 )
 
                         st.markdown("<br>", unsafe_allow_html=True)
 
-                        promedio_eval = sum(calificaciones) / len(calificaciones)
-                        max_cal = max(calificaciones)
-                        min_cal = min(calificaciones)
+                        # Métricas de evaluaciones (sin asistencia)
+                        califs_solo_eval = calificaciones_todas[1:]  # excluir asistencia
+                        promedio_eval = round(sum(califs_solo_eval) / len(califs_solo_eval), 1) if califs_solo_eval else 0
+                        max_cal = max(califs_solo_eval) if califs_solo_eval else 0
+                        min_cal = min(califs_solo_eval) if califs_solo_eval else 0
 
                         col1, col2, col3 = st.columns(3)
                         with col1:
                             st.markdown(f"""<div class="stat-card">
                                 <div class="stat-title">Promedio Evaluaciones</div>
-                                <div class="stat-value">{promedio_eval:.1f}</div>
+                                <div class="stat-value">{promedio_eval}</div>
                                 <div class="stat-sub">sobre 10 puntos</div>
                             </div>""", unsafe_allow_html=True)
                         with col2:
@@ -1335,41 +1359,59 @@ elif st.session_state.accion_actual == "estadistica":
 
                         st.markdown("<br>", unsafe_allow_html=True)
 
-                        # ── RESUMEN GENERAL ──────────────────
-                        st.markdown('<div class="seccion-titulo">🏆 RESUMEN GENERAL</div>', unsafe_allow_html=True)
+                        # ── CALIFICACIÓN PROMEDIO FINAL DEL TRIMESTRE ──
+                        st.markdown('<div class="seccion-titulo">🏆 CALIFICACIÓN PROMEDIO FINAL DEL TRIMESTRE</div>', unsafe_allow_html=True)
 
-                        promedio_general = (nota_asistencia + promedio_eval) / 2
+                        promedio_final_trimestre = round(sum(calificaciones_todas) / len(calificaciones_todas), 1)
 
-                        if promedio_general >= 9:
-                            color_gral = "#1a7a4a"
-                            texto_gral = "Rendimiento Excelente"
-                        elif promedio_general >= 8:
-                            color_gral = "#2d6a9f"
-                            texto_gral = "Muy Buen Rendimiento"
-                        elif promedio_general >= 7:
-                            color_gral = "#4a90d9"
-                            texto_gral = "Buen Rendimiento"
-                        elif promedio_general >= 6:
-                            color_gral = "#e8a020"
-                            texto_gral = "Rendimiento Regular"
+                        if promedio_final_trimestre >= 9:
+                            alerta_color = "#1a7a4a"
+                            alerta_borde = "#27ae60"
+                            alerta_icono = "🟢"
+                            alerta_texto = "Sobresaliente"
+                        elif promedio_final_trimestre >= 8:
+                            alerta_color = "#1a4a7a"
+                            alerta_borde = "#2980b9"
+                            alerta_icono = "🔵"
+                            alerta_texto = "Muy bueno"
+                        elif promedio_final_trimestre >= 7:
+                            alerta_color = "#1a5c3a"
+                            alerta_borde = "#27ae60"
+                            alerta_icono = "🟢"
+                            alerta_texto = "Bueno"
+                        elif promedio_final_trimestre >= 6:
+                            alerta_color = "#7a5a00"
+                            alerta_borde = "#f39c12"
+                            alerta_icono = "🟡"
+                            alerta_texto = "Regular — requiere atención"
                         else:
-                            color_gral = "#c0392b"
-                            texto_gral = "Necesita Mejorar"
+                            alerta_color = "#7a1a1a"
+                            alerta_borde = "#e74c3c"
+                            alerta_icono = "🔴"
+                            alerta_texto = "Insuficiente — requiere intervención"
 
                         st.markdown(f"""
-                        <div style='background:linear-gradient(135deg,{color_gral},{color_gral}cc);
-                        padding:20px;border-radius:12px;text-align:center;margin:10px 0;'>
-                            <div style='font-size:36px;font-weight:800;color:white;'>
-                                {promedio_general:.1f}
-                            </div>
-                            <div style='font-size:16px;color:rgba(255,255,255,0.9);
-                            font-weight:600;margin-top:4px;'>
-                                {texto_gral}
-                            </div>
-                            <div style='font-size:12px;color:rgba(255,255,255,0.7);
-                            margin-top:6px;'>
-                                Asistencia {nota_asistencia} + 
-                                Evaluaciones {promedio_eval:.1f} ÷ 2
+                        <div style='
+                            border-left: 5px solid {alerta_borde};
+                            background: linear-gradient(135deg, {alerta_color}22, {alerta_color}11);
+                            padding: 20px 24px;
+                            border-radius: 10px;
+                            margin: 10px 0;
+                            display: flex;
+                            align-items: center;
+                            gap: 16px;
+                        '>
+                            <div style='font-size:48px;'>{alerta_icono}</div>
+                            <div>
+                                <div style='font-size:36px;font-weight:800;color:{alerta_borde};
+                                line-height:1;'>{promedio_final_trimestre}</div>
+                                <div style='font-size:15px;font-weight:600;color:#2c3e50;
+                                margin-top:4px;'>{alerta_texto}</div>
+                                <div style='font-size:11px;color:#7f8c8d;margin-top:4px;'>
+                                    Promedio de {len(calificaciones_todas)} evaluaciones 
+                                    incluyendo asistencia ({nota_asistencia}) + 
+                                    evaluaciones ({promedio_eval})
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
