@@ -1,524 +1,523 @@
 import streamlit as st
-import json
-import os
 import pandas as pd
+import os
 from datetime import datetime, date
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
 
 # Ocultar sidebar completamente
 st.markdown("""
 <style>
 [data-testid="stSidebar"] {
-    display: none !important;
-}
-section[data-testid="stSidebar"] {
-    display: none !important;
-}
-aside[data-testid="stSidebar"] {
-    display: none !important;
+    display: block !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 st.set_page_config(
-    page_title="Sistema IES Completo",
-    page_icon="🎓",
+    page_title="Sistema de Gestión Educativa",
+    page_icon="📚",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Enlace del spreadsheet existente
-EXISTING_SPREADSHEET = "https://docs.google.com/spreadsheets/d/10sSBzhpkEPYk78jEctV6XzRoyFJpaYznQPnv9T6VpPc/edit?usp=drive_link"
-
 # Título principal
-st.title("🎓 Sistema Integral IES")
-st.write("Plataforma completa de gestión educativa con backup automático")
+st.title("📚 Sistema de Gestión Educativa")
+st.write("Dashboard completo para gestión de alumnos, asistencia y evaluaciones")
+
+# Sidebar con filtros
+st.sidebar.header("🔍 Filtros")
+
+# Filtro de cursos
+cursos_disponibles = ["Todos", "EF 1A", "EF 2A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
+curso_seleccionado = st.sidebar.selectbox("📂 Seleccionar Curso:", cursos_disponibles)
+
+# Filtro de trimestres
+trimestres_disponibles = ["Todos", "1 Trimestre", "2 Trimestre", "3 Trimestre"]
+trimestre_seleccionado = st.sidebar.selectbox("📅 Seleccionar Trimestre:", trimestres_disponibles)
+
+# Filtro de alumno
+alumnos_disponibles = ["Todos", "Ana García", "Carlos López", "María Rodríguez", "Juan Martínez", "Laura Sánchez"]
+alumno_seleccionado = st.sidebar.selectbox("👤 Seleccionar Alumno:", alumnos_disponibles)
 
 # Sistema de navegación por pestañas
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Dashboard", 
-    "👥 Alumnos", 
+tab1, tab2, tab3 = st.tabs([
+    "📊 Gestión de Alumnos", 
     "📋 Asistencia", 
-    "📝 Evaluaciones", 
-    "🔧 Configuración"
+    "📝 Evaluaciones"
 ])
 
-# Función para cargar credenciales
-def cargar_credenciales():
-    if os.path.exists('google_drive_credentials.json'):
-        try:
-            with open('google_drive_credentials.json', 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            st.error(f"Error cargando credenciales: {e}")
-            return None
-    return None
-
-# Función para conectar a Google Sheets
-def conectar_google_sheets():
-    creds = cargar_credenciales()
-    if not creds:
-        return None, None
+# Función para crear/leer Excel
+def crear_excel_si_no_existe():
+    archivo_excel = "sistema_educativo.xlsx"
     
-    try:
-        scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        creds_obj = ServiceAccountCredentials.from_json_keyfile_name('google_drive_credentials.json', scope)
-        client = gspread.authorize(creds_obj)
-        spreadsheet = client.open_by_key("10sSBzhpkEPYk78jEctV6XzRoyFJpaYznQPnv9T6VpPc")
-        return client, spreadsheet
-    except Exception as e:
-        st.error(f"Error conectando a Google Sheets: {e}")
-        return None, None
-
-# Función para obtener datos del spreadsheet
-def obtener_datos(worksheet_name):
-    client, spreadsheet = conectar_google_sheets()
-    if not client or not spreadsheet:
-        return pd.DataFrame()
-    
-    try:
-        worksheet = spreadsheet.worksheet(worksheet_name)
-        data = worksheet.get_all_records()
-        return pd.DataFrame(data)
-    except Exception as e:
-        st.error(f"Error obteniendo datos de {worksheet_name}: {e}")
-        return pd.DataFrame()
-
-# Función para guardar datos en Google Sheets
-def guardar_datos(worksheet_name, df):
-    client, spreadsheet = conectar_google_sheets()
-    if not client or not spreadsheet:
-        return False
-    
-    try:
-        try:
-            worksheet = spreadsheet.worksheet(worksheet_name)
-        except:
-            worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows="1000", cols="50")
+    if not os.path.exists(archivo_excel):
+        # Crear workbook
+        wb = openpyxl.Workbook()
         
-        worksheet.clear()
-        worksheet.update([df.columns.tolist()] + df.values.tolist())
+        # Eliminar hoja por defecto
+        wb.remove(wb.active)
+        
+        # Crear hojas para cada trimestre
+        for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
+            ws = wb.create_sheet(title=trimestre)
+            
+            # Encabezados
+            headers = [
+                "Apellido y Nombre", "Curso", 
+                # Asistencia diaria (marzo-mayo para 1 trimestre)
+                "Mar-01", "Mar-02", "Mar-03", "Mar-04", "Mar-05", "Mar-06", "Mar-07", "Mar-08", "Mar-09", "Mar-10",
+                "Mar-11", "Mar-12", "Mar-13", "Mar-14", "Mar-15", "Mar-16", "Mar-17", "Mar-18", "Mar-19", "Mar-20",
+                "Mar-21", "Mar-22", "Mar-23", "Mar-24", "Mar-25", "Mar-26", "Mar-27", "Mar-28", "Mar-29", "Mar-30", "Mar-31",
+                "Abr-01", "Abr-02", "Abr-03", "Abr-04", "Abr-05", "Abr-06", "Abr-07", "Abr-08", "Abr-09", "Abr-10",
+                "Abr-11", "Abr-12", "Abr-13", "Abr-14", "Abr-15", "Abr-16", "Abr-17", "Abr-18", "Abr-19", "Abr-20",
+                "Abr-21", "Abr-22", "Abr-23", "Abr-24", "Abr-25", "Abr-26", "Abr-27", "Abr-28", "Abr-29", "Abr-30",
+                "May-01", "May-02", "May-03", "May-04", "May-05", "May-06", "May-07", "May-08", "May-09", "May-10",
+                "May-11", "May-12", "May-13", "May-14", "May-15", "May-16", "May-17", "May-18", "May-19", "May-20",
+                "May-21", "May-22", "May-23", "May-24", "May-25", "May-26", "May-27", "May-28", "May-29", "May-30", "May-31",
+                "Nota Asistencia",
+                # Evaluaciones
+                "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", 
+                "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6",
+                "Nota Final Evaluaciones", "Observaciones"
+            ]
+            
+            # Escribir encabezados
+            for col_num, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_num, value=header)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center")
+        
+        # Guardar archivo
+        wb.save(archivo_excel)
+        st.success(f"✅ Archivo Excel creado: {archivo_excel}")
+    
+    return archivo_excel
+
+# Función para leer datos del Excel
+def leer_datos_excel(trimestre):
+    archivo_excel = "sistema_educativo.xlsx"
+    
+    if not os.path.exists(archivo_excel):
+        crear_excel_si_no_existe()
+        return pd.DataFrame()
+    
+    try:
+        df = pd.read_excel(archivo_excel, sheet_name=trimestre)
+        return df
+    except:
+        return pd.DataFrame()
+
+# Función para guardar datos en Excel
+def guardar_datos_excel(df, trimestre):
+    archivo_excel = "sistema_educativo.xlsx"
+    
+    try:
+        with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name=trimestre, index=False)
         return True
     except Exception as e:
-        st.error(f"Error guardando datos en {worksheet_name}: {e}")
+        st.error(f"Error guardando datos: {e}")
         return False
 
-# ==================== TAB 1: DASHBOARD ====================
-with tab1:
-    st.header("📊 Dashboard General")
-    
-    creds = cargar_credenciales()
-    if creds:
-        st.success("✅ Google Drive Backup conectado")
-        st.info(f"📧 Email: {creds.get('client_email', 'No disponible')}")
+# Función para calcular nota de asistencia
+def calcular_nota_asistencia(porcentaje_asistencia):
+    if porcentaje_asistencia >= 80:
+        return 10  # Ex
+    elif porcentaje_asistencia >= 51:
+        return 8   # R+
     else:
-        st.warning("⚠️ Configura tus credenciales en la pestaña 'Configuración'")
-    
-    # Métricas principales
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("📚 Total Alumnos", "245", delta="12")
-    
-    with col2:
-        st.metric("📅 Asistencia Hoy", "92%", delta="5%")
-    
-    with col3:
-        st.metric("📝 Evaluaciones", "18", delta="3")
-    
-    with col4:
-        st.metric("📊 Reportes", "7", delta="2")
-    
-    st.markdown("---")
-    
-    # Filtros por año
-    st.subheader("📅 Filtros por Año")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        año_actual = date.today().year
-        años_disponibles = list(range(año_actual - 5, año_actual + 1))
-        año_seleccionado = st.selectbox("Seleccionar Año:", años_disponibles, key="dashboard_año")
-    
-    with col2:
-        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
-                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-        mes_seleccionado = st.selectbox("Seleccionar Mes:", meses, key="dashboard_mes")
-    
-    with col3:
-        cursos_dashboard = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-        curso_seleccionado = st.selectbox("Seleccionar Curso:", cursos_dashboard, key="dashboard_curso")
-    
-    # Gráfico de asistencia
-    st.markdown("---")
-    st.subheader("📈 Tendencia de Asistencia")
-    
-    # Datos de ejemplo para el gráfico
-    datos_asistencia = {
-        'Mes': ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio'],
-        'Asistencia': [88, 92, 85, 90, 94, 89]
-    }
-    
-    df_asistencia = pd.DataFrame(datos_asistencia)
-    st.bar_chart(df_asistencia, x='Mes', y='Asistencia')
-    
-    # Últimas actividades
-    st.markdown("---")
-    st.subheader("🔄 Últimas Actividades")
-    
-    actividades = [
-        {"fecha": "2024-03-18", "actividad": "Nueva evaluación agregada", "usuario": "Prof. García"},
-        {"fecha": "2024-03-17", "actividad": "Reporte mensual generado", "usuario": "Sistema"},
-        {"fecha": "2024-03-16", "actividad": "Asistencia actualizada", "usuario": "Prof. Martínez"},
-        {"fecha": "2024-03-15", "actividad": "Nuevo alumno inscripto", "usuario": "Admin"}
-    ]
-    
-    for actividad in actividades:
-        st.write(f"📅 {actividad['fecha']} - {actividad['actividad']} ({actividad['usuario']})")
+        return 5   # M
 
-# ==================== TAB 2: ALUMNOS ====================
-with tab2:
-    st.header("👥 Gestión de Alumnos")
+# Función para convertir calificación a número
+def calificacion_a_numero(calif):
+    calif = str(calif).upper().strip()
+    if calif == "M":
+        return 4
+    elif calif == "R-":
+        return 6
+    elif calif == "R+":
+        return 7
+    elif calif == "B":
+        return 8
+    elif calif == "MB":
+        return 9
+    elif calif == "EX":
+        return 10
+    else:
+        try:
+            return float(calif)
+        except:
+            return 0
+
+# Crear archivo Excel si no existe
+archivo_excel = crear_excel_si_no_existe()
+
+# ==================== TAB 1: GESTIÓN DE ALUMNOS ====================
+with tab1:
+    st.header("📊 Gestión de Alumnos")
     
     # Formulario para agregar nuevo alumno
     with st.expander("➕ Agregar Nuevo Alumno"):
         col1, col2 = st.columns(2)
         
         with col1:
-            nombre = st.text_input("Nombre Completo:", key="alumno_nombre")
-            dni = st.text_input("DNI:", key="alumno_dni")
-            email = st.text_input("Email:", key="alumno_email")
-            telefono = st.text_input("Teléfono:", key="alumno_telefono")
+            nombre_alumno = st.text_input("👤 Apellido y Nombre:", key="nuevo_alumno_nombre")
+            curso_alumno = st.selectbox("📂 Curso:", ["EF 1A", "EF 2A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="nuevo_alumno_curso")
         
         with col2:
-            fecha_nacimiento = st.date_input("Fecha de Nacimiento:", key="alumno_nacimiento")
-            cursos_alumno = ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-            curso = st.selectbox("Curso:", cursos_alumno, key="alumno_curso")
-            direccion = st.text_area("Dirección:", key="alumno_direccion")
-            estados_alumno = ["Activo", "Inactivo", "Egresado"]
-            estado = st.selectbox("Estado:", estados_alumno, key="alumno_estado")
+            trimestre_alumno = st.selectbox("📅 Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="nuevo_alumno_trimestre")
         
-        if st.button("💾 Guardar Alumno", type="primary", key="guardar_alumno"):
-            st.success("✅ Alumno guardado exitosamente!")
-            st.balloons()
+        if st.button("➕ Agregar Alumno", type="primary", key="agregar_alumno"):
+            if nombre_alumno and curso_alumno and trimestre_alumno:
+                # Leer datos existentes
+                df_existente = leer_datos_excel(trimestre_alumno)
+                
+                # Crear nueva fila
+                nueva_fila = {
+                    "Apellido y Nombre": nombre_alumno,
+                    "Curso": curso_alumno
+                }
+                
+                # Agregar fila al DataFrame
+                df_nuevo = pd.concat([df_existente, pd.DataFrame([nueva_fila])], ignore_index=True)
+                
+                # Guardar en Excel
+                if guardar_datos_excel(df_nuevo, trimestre_alumno):
+                    st.success(f"✅ Alumno {nombre_alumno} agregado exitosamente!")
+                    st.balloons()
+                    st.rerun()
+            else:
+                st.error("❌ Por favor completa todos los campos")
     
+    # Mostrar alumnos existentes
     st.markdown("---")
+    st.subheader("📋 Alumnos Existentes")
     
-    # Filtros de búsqueda
-    st.subheader("🔍 Filtros de Búsqueda")
+    # Seleccionar trimestre para mostrar
+    trimestre_mostrar = st.selectbox("📅 Seleccionar Trimestre para ver:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="mostrar_trimestre")
     
-    col1, col2, col3 = st.columns(3)
+    df_alumnos = leer_datos_excel(trimestre_mostrar)
     
-    with col1:
-        filtro_nombre = st.text_input("Buscar por Nombre:", key="filtro_nombre")
-    
-    with col2:
-        cursos_filtro = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-        filtro_curso = st.selectbox("Filtrar por Curso:", cursos_filtro, key="filtro_curso")
-    
-    with col3:
-        estados_filtro = ["Todos", "Activo", "Inactivo", "Egresado"]
-        filtro_estado = st.selectbox("Filtrar por Estado:", estados_filtro, key="filtro_estado")
-    
-    # Tabla de alumnos (datos de ejemplo)
-    st.markdown("---")
-    st.subheader("📋 Lista de Alumnos")
-    
-    datos_alumnos = [
-        {"DNI": "12345678", "Nombre": "Ana García", "Curso": "3° Año", "Email": "ana@email.com", "Estado": "Activo"},
-        {"DNI": "23456789", "Nombre": "Carlos López", "Curso": "2° Año", "Email": "carlos@email.com", "Estado": "Activo"},
-        {"DNI": "34567890", "Nombre": "María Rodríguez", "Curso": "4° Año", "Email": "maria@email.com", "Estado": "Activo"},
-        {"DNI": "45678901", "Nombre": "Juan Martínez", "Curso": "1° Año", "Email": "juan@email.com", "Estado": "Inactivo"},
-        {"DNI": "56789012", "Nombre": "Laura Sánchez", "Curso": "5° Año", "Email": "laura@email.com", "Estado": "Activo"}
-    ]
-    
-    df_alumnos = pd.DataFrame(datos_alumnos)
-    st.dataframe(df_alumnos, use_container_width=True)
+    if not df_alumnos.empty:
+        # Aplicar filtros
+        if curso_seleccionado != "Todos":
+            df_alumnos = df_alumnos[df_alumnos["Curso"] == curso_seleccionado]
+        
+        if alumno_seleccionado != "Todos":
+            df_alumnos = df_alumnos[df_alumnos["Apellido y Nombre"] == alumno_seleccionado]
+        
+        if not df_alumnos.empty:
+            st.dataframe(df_alumnos[["Apellido y Nombre", "Curso"]], use_container_width=True)
+        else:
+            st.info("📋 No hay alumnos que coincidan con los filtros seleccionados")
+    else:
+        st.info("📋 No hay alumnos registrados en este trimestre")
 
-# ==================== TAB 3: ASISTENCIA ====================
-with tab3:
+# ==================== TAB 2: ASISTENCIA ====================
+with tab2:
     st.header("📋 Gestión de Asistencia")
     
-    # Selector de fecha
-    st.subheader("📅 Registrar Asistencia")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fecha_asistencia = st.date_input("Fecha de Asistencia:", value=datetime.now().date(), key="asistencia_fecha")
-        cursos_asistencia = ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-        curso_asistencia = st.selectbox("Curso:", cursos_asistencia, key="asistencia_curso")
-    
-    with col2:
-        st.write("📊 Estadísticas del día:")
-        st.metric("Presentes", "42", delta="2")
-        st.metric("Ausentes", "3", delta="-1")
-        st.metric("Tardanzas", "2", delta="0")
-    
-    st.markdown("---")
-    
-    # Registro de asistencia
-    st.subheader("✅ Marcar Asistencia")
-    
-    # Datos de ejemplo para la tabla
-    datos_asistencia_registro = [
-        {"DNI": "12345678", "Nombre": "Ana García", "Estado": "Presente", "Hora": "08:00"},
-        {"DNI": "23456789", "Nombre": "Carlos López", "Estado": "Presente", "Hora": "08:05"},
-        {"DNI": "34567890", "Nombre": "María Rodríguez", "Estado": "Tarde", "Hora": "08:15"},
-        {"DNI": "45678901", "Nombre": "Juan Martínez", "Estado": "Ausente", "Hora": "-"},
-        {"DNI": "56789012", "Nombre": "Laura Sánchez", "Estado": "Presente", "Hora": "08:02"}
-    ]
-    
-    df_asistencia_registro = pd.DataFrame(datos_asistencia_registro)
-    st.dataframe(df_asistencia_registro, use_container_width=True)
-    
-    if st.button("💾 Guardar Asistencia", type="primary", key="guardar_asistencia"):
-        st.success("✅ Asistencia guardada exitosamente!")
-        st.info("📊 Los datos han sido respaldados en Google Drive")
-        st.balloons()
-
-# ==================== TAB 4: EVALUACIONES ====================
-with tab4:
-    st.header("📝 Gestión de Evaluaciones")
-    
-    # Formulario para nueva evaluación
-    with st.expander("➕ Crear Nueva Evaluación"):
-        col1, col2 = st.columns(2)
+    # Formulario para marcar asistencia
+    with st.expander("✅ Marcar Asistencia"):
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            titulo_eval = st.text_input("Título de Evaluación:", key="evaluacion_titulo")
-            cursos_eval = ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-            curso_eval = st.selectbox("Curso:", cursos_eval, key="evaluacion_curso")
-            tipos_eval = ["Parcial", "Final", "Trabajo Práctico", "Proyecto"]
-            tipo_eval = st.selectbox("Tipo:", tipos_eval, key="evaluacion_tipo")
-            fecha_eval = st.date_input("Fecha de Evaluación:", key="evaluacion_fecha")
+            trimestre_asistencia = st.selectbox("📅 Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="asistencia_trimestre")
+            
+            # Obtener alumnos del trimestre
+            df_alumnos_asistencia = leer_datos_excel(trimestre_asistencia)
+            if not df_alumnos_asistencia.empty:
+                alumnos_lista = df_alumnos_asistencia["Apellido y Nombre"].tolist()
+                alumno_asistencia = st.selectbox("👤 Alumno:", alumnos_lista, key="asistencia_alumno")
+            else:
+                st.warning("⚠️ No hay alumnos registrados en este trimestre")
+                alumno_asistencia = None
         
         with col2:
-            descripcion_eval = st.text_area("Descripción:", key="evaluacion_descripcion")
-            ponderacion_eval = st.number_input("Ponderación (%)", min_value=0, max_value=100, value=100, key="evaluacion_ponderacion")
-            estados_eval = ["Pendiente", "En Curso", "Finalizada"]
-            estado_eval = st.selectbox("Estado:", estados_eval, key="evaluacion_estado")
+            fecha_asistencia = st.date_input("📅 Fecha:", value=datetime.now().date(), key="asistencia_fecha")
+            estado_asistencia = st.selectbox("📊 Estado:", ["Presente", "Ausente"], key="asistencia_estado")
         
-        if st.button("📝 Crear Evaluación", type="primary", key="crear_evaluacion"):
-            st.success("✅ Evaluación creada exitosamente!")
-            st.info("📊 La evaluación ha sido agregada al sistema")
-            st.balloons()
-    
-    st.markdown("---")
-    
-    # Lista de evaluaciones
-    st.subheader("📋 Lista de Evaluaciones")
-    
-    # Datos de ejemplo
-    datos_evaluaciones = [
-        {"Título": "Parcial Matemáticas", "Curso": "3° Año", "Tipo": "Parcial", "Fecha": "2024-03-15", "Estado": "Finalizada"},
-        {"Título": "Trabajo Práctico Historia", "Curso": "4° Año", "Tipo": "Trabajo Práctico", "Fecha": "2024-03-18", "Estado": "En Curso"},
-        {"Título": "Proyecto Ciencias", "Curso": "2° Año", "Tipo": "Proyecto", "Fecha": "2024-03-20", "Estado": "Pendiente"},
-        {"Título": "Final Lengua", "Curso": "5° Año", "Tipo": "Final", "Fecha": "2024-03-10", "Estado": "Finalizada"}
-    ]
-    
-    df_evaluaciones = pd.DataFrame(datos_evaluaciones)
-    st.dataframe(df_evaluaciones, use_container_width=True)
-    
-    # Filtros
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        cursos_filtro_eval = ["Todos", "1° Año", "2° Año", "3° Año", "4° Año", "5° Año"]
-        filtro_curso_eval = st.selectbox("Filtrar por Curso:", cursos_filtro_eval, key="filtro_eval_curso")
-    
-    with col2:
-        tipos_filtro_eval = ["Todos", "Parcial", "Final", "Trabajo Práctico", "Proyecto"]
-        filtro_tipo_eval = st.selectbox("Filtrar por Tipo:", tipos_filtro_eval, key="filtro_eval_tipo")
-    
-    with col3:
-        estados_filtro_eval = ["Todos", "Pendiente", "En Curso", "Finalizada"]
-        filtro_estado_eval = st.selectbox("Filtrar por Estado:", estados_filtro_eval, key="filtro_eval_estado")
-
-# ==================== TAB 5: CONFIGURACIÓN ====================
-with tab5:
-    st.header("🔧 Configuración del Sistema")
-    
-    # Subsección de backup
-    st.subheader("💾 Google Drive Backup")
-    
-    # Formulario para ingresar credenciales manualmente
-    with st.form("credentials_form"):
-        st.write("Ingresa tus credenciales de Google Cloud:")
-        
-        project_id = st.text_input("Project ID", value="turnkey-realm-490621-g6", help="Tu ID de proyecto de Google Cloud", key="project_id")
-        private_key_id = st.text_input("Private Key ID", value="23197905dd3b00c010c0c95176ee2d7ef31690f6", help="ID de tu clave privada", key="private_key_id")
-        client_email = st.text_input("Client Email", value="dashboard-backup@turnkey-realm-490621-g6.iam.gserviceaccount.com", help="Email de tu cuenta de servicio", key="client_email")
-        client_id = st.text_input("Client ID", value="112970843523581797879", help="ID de tu cliente", key="client_id")
-        private_key = st.text_area("Private Key", value="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDQmT9B3VOTdpL9\napPEOSFvFzLiv8vA7IP/5WmAV1KBTZ/5VOPKtrMHKDTedsBQpGbr68Nr5uPR03s7\n3T8PbEumSiV9Npj6Nqjb4hNq9sIq7mBaDJlcmYnBjpaqUo1zTVICOkUi9nXIk3wN\nqGmFsSxmlg/iNGH92Hwyqq0IRgT13HmlGLLpOv6uy3DaUXdg3Xl7jq/gbjLDTk4e\nUc+0TEA3Qd1djkHUYjqaxNcK+/Ie1GyF8hy6hB9YIkciiShBA8KKFi/Q8mxwIH5D\nfadiFqAwMIzdoPAHMwmQH/qw2PkK1Brk8y2cDIr8peoQPI+UyunbZERdLf+TmbYm\n3RgoTYqHAgMBAAECggEALyh2BI3ktxG3aVMO1O2VgWfdOSXjClpt/QwALeOP42uJ\nHvTyCoIDNzr/uMtf7ts76VoDdAFev7DvyzjZaMMy1wUsNIKDUw3IXu1dNnFStCHv\n5muywBx16Cw0I41GLSrtv1MtDhppxk6RXQUV1gOX5hlGvfzZqmmmqk2rkJNDy9ED\nqBLVt9DCu/MH6TFRrFQAsXSN7BvotXfs2TorSWpxQEyYAHUIHd7l3kMsDFog0nnt\noxGXukJtjOpk7cKjLJN/s+GKUUQRjT5fXKNmFzAJssfqIp8MerRyOVJvQl63rhyG\n1e0iqPEIxCxSE5uW6cNnfwRXUQelIPbZfsOZBmI1AQKBgQDtvdEvXkG7bHx5+3w6\nOsjAPDAwv7RyTQ+vC03hZVAOByUsQUCe/LHAecrYrLyEG7dEv2ILvGt2D02QXCEk\nt8LVA+Dk8pPDZS1fUSYfYFyWX0eTaL1ywjoBNPSuwauo5FmT3W4OAmUovluM0fpk\nkttGdmk1Nr5BAHDYgST8dIWRQwKBgQDgnnVxqmDAjSEBcOtxt2ZUhcZ0nGiqmRE+\nBISuqUmyR18svPn/Z+ERrULM4/JYyJh0IUEW3q5d0qVoZYPrf3ZZNx6nbvwxUFeI\no8e53NoXlxo8uvNDUjoNpbt1mK4+ycrkJz56cymQ3+4yHfQGbDGwn2KfF4aVgqRD\nAqjEuNb7bQKBgGr+7cFKw3yNg6wGgc9XG3hg3jNiY9y5T+CwzrktNo1Jq/Ix39pt\n0bXVWnSPsTwnmSConYC4qH2NKtOu1/iEB58Y1/GyLe8tmHajLS8Uo8ejIEMN48J\nWL+oTKLF6PLW6nXAx0Io08w1d9B1xCI1cdhRfGIFpDRu9VqLLNEtw9svAoGBALak\nAikneb53wvOyBrATiXCGyiS9nVnCVsPP1rdSzarZ3+i3zKvBor/F20BQxRkuGtCq\nzYs0DCIcCwVFLixKG0hVymYol4Xdpx9i1R8rFmcCJYJmHTGLZcr9DN2FBYHmgURd\nKK9WfuDfRIaZ1nd2eDz+jKmB7pwZe0lFm0dCaQRNAoGAGNqYxXyY64TmQjL6z6WR\nREfFhx3z5bjtc5Z2/JIT7QLCCZJzd/ObKW0xdJ+h3uvUemYFMJt3V4aBVhtlzGxr\nUQ0eaOw+61wDYTc7pwHp6XpBs5G56DmSzmPTPtDM0TWoBK/qXVYxjq8N4uwofun\nYKi8CaOnXQDNl/T1wj34RSo=\n-----END PRIVATE KEY-----", height=200, help="Tu clave privada completa", key="private_key")
-        
-        submitted = st.form_submit_button("💾 Guardar Credenciales", type="primary", use_container_width=True, help="Guarda las credenciales localmente")
-        
-        if submitted:
-            credentials = {
-                "type": "service_account",
-                "project_id": project_id,
-                "private_key_id": private_key_id,
-                "private_key": private_key,
-                "client_email": client_email,
-                "client_id": client_id,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/dashboard-backup%40turnkey-realm-490621-g6.iam.gserviceaccount.com",
-                "universe_domain": "googleapis.com"
-            }
-            
-            with open('google_drive_credentials.json', 'w') as f:
-                json.dump(credentials, f, indent=2)
-            
-            st.success("✅ Credenciales guardadas exitosamente!")
-            st.balloons()
-            st.rerun()
-    
-    # Estado del backup
-    if os.path.exists('google_drive_credentials.json'):
-        st.success("✅ Credenciales configuradas y listas para usar")
-        
-        try:
-            with open('google_drive_credentials.json', 'r') as f:
-                creds = json.load(f)
-            
-            # Mostrar información de la cuenta
-            st.markdown("---")
-            st.subheader("📋 Información de la Cuenta")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.info(f"📧 **Email:**\n{creds.get('client_email', 'No disponible')}")
-            
-            with col2:
-                st.info(f"🆔 **Project ID:**\n{creds.get('project_id', 'No disponible')}")
-            
-            with col3:
-                st.info(f"🆎 **Client ID:**\n{creds.get('client_id', 'No disponible')}")
-            
-            # Mostrar información del backup existente
-            st.markdown("---")
-            st.subheader("📁 Backup Automático Actual")
-            
-            st.success("✅ **Backup automático ya está ACTIVO!**")
-            st.markdown(f"📁 **[📂 Ver Backup Actual]({EXISTING_SPREADSHEET})**")
-            st.info("📧 **Todos los datos se guardan automáticamente en solpeschuk@gmail.com**")
-            
-            # Botones de acción
-            st.markdown("---")
-            st.subheader("🚀 Opciones de Backup")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("📂 Ver Backup Actual", type="secondary", use_container_width=True, key="ver_backup"):
-                    st.markdown(f"📁 **[🔗 Abrir Backup Actual]({EXISTING_SPREADSHEET})**")
-            
-            with col2:
-                if st.button("🆕 Crear Nuevo Backup", type="primary", use_container_width=True, key="crear_backup"):
-                    try:
-                        import gspread
-                        from oauth2client.service_account import ServiceAccountCredentials
+        with col3:
+            if st.button("✅ Marcar Asistencia", type="primary", key="marcar_asistencia"):
+                if alumno_asistencia:
+                    # Leer datos existentes
+                    df_existente = leer_datos_excel(trimestre_asistencia)
+                    
+                    # Encontrar fila del alumno
+                    alumno_fila = df_existente[df_existente["Apellido y Nombre"] == alumno_asistencia]
+                    
+                    if not alumno_fila.empty:
+                        # Obtener índice
+                        idx = alumno_fila.index[0]
                         
-                        with st.spinner("🔄 Creando nuevo backup..."):
-                            # Configurar credenciales
-                            scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-                            creds_obj = ServiceAccountCredentials.from_json_keyfile_name('google_drive_credentials.json', scope)
-                            client = gspread.authorize(creds_obj)
-                            
-                            # Crear nuevo spreadsheet
-                            new_spreadsheet = client.create("Dashboard IES - Backup Nuevo")
-                            
-                            # Compartir con el email
-                            new_spreadsheet.share('solpeschuk@gmail.com', perm_type='user', role='writer')
-                            
-                            st.success("✅ **Nuevo backup creado exitosamente!**")
-                            st.info(f"📁 **Nuevo spreadsheet:** {new_spreadsheet.url}")
-                            st.info("🎉 **¡Tienes dos backups activos!**")
+                        # Formatear fecha para columna
+                        fecha_str = fecha_asistencia.strftime("%b-%d")
+                        
+                        # Marcar asistencia
+                        df_existente.at[idx, fecha_str] = "Presente" if estado_asistencia == "Presente" else "Ausente"
+                        
+                        # Calcular nota de asistencia
+                        # Contar presentes y ausentes
+                        columnas_asistencia = [col for col in df_existente.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dec-"])]
+                        
+                        presentes = 0
+                        totales = 0
+                        
+                        for col in columnas_asistencia:
+                            if pd.notna(df_existente.at[idx, col]):
+                                totales += 1
+                                if df_existente.at[idx, col] == "Presente":
+                                    presentes += 1
+                        
+                        if totales > 0:
+                            porcentaje = (presentes / totales) * 100
+                            nota_asistencia = calcular_nota_asistencia(porcentaje)
+                            df_existente.at[idx, "Nota Asistencia"] = nota_asistencia
+                        
+                        # Guardar en Excel
+                        if guardar_datos_excel(df_existente, trimestre_asistencia):
+                            st.success(f"✅ Asistencia marcada para {alumno_asistencia}")
+                            st.info(f"📊 Porcentaje de asistencia: {porcentaje:.1f}% - Nota: {nota_asistencia}")
                             st.balloons()
-                            
-                            # Backup de prueba en el nuevo spreadsheet
-                            import pandas as pd
-                            from datetime import datetime
-                            
-                            test_data = pd.DataFrame({
-                                'Test': ['🆕 Nuevo Backup Creado'],
-                                'Fecha': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-                                'Email': ['solpeschuk@gmail.com'],
-                                'Estado': ['✅ Activo y Funcionando'],
-                                'Método': ['💾 Configuración Manual'],
-                                'Project_ID': [creds.get('project_id', 'No disponible')],
-                                'Spreadsheet_Anterior': [EXISTING_SPREADSHEET]
-                            })
-                            
-                            # Agregar datos al nuevo spreadsheet
-                            worksheet = new_spreadsheet.worksheet(0)
-                            data = [test_data.columns.tolist()] + test_data.values.tolist()
-                            worksheet.update('A1', data)
-                            
-                            st.success("✅ **Datos de prueba agregados al nuevo backup!**")
-                            st.balloons()
-                            
-                    except ImportError:
-                        st.error("❌ **Bibliotecas no instaladas**")
-                        st.info("📦 **Las bibliotecas se están instalando automáticamente en Streamlit Cloud**")
-                    except Exception as e:
-                        st.error(f"❌ **Error creando nuevo backup:** {e}")
-                        st.info("🔧 **Revisa que tus credenciales sean correctas**")
-            
-            # Botón para eliminar credenciales
-            st.markdown("---")
-            if st.button("🗑️ Eliminar Credenciales", use_container_width=True, key="eliminar_credenciales"):
-                os.remove('google_drive_credentials.json')
-                st.success("✅ **Credenciales eliminadas exitosamente!**")
-                st.rerun()
-                
-        except Exception as e:
-            st.error(f"❌ **Error al leer credenciales:** {e}")
-            st.info("🔧 **Revisa que el archivo de credenciales no esté corrupto**")
-    else:
-        st.warning("⚠️ **Configura tus credenciales arriba para activar el backup automático**")
+                            st.rerun()
+                    else:
+                        st.error("❌ Alumno no encontrado")
+                else:
+                    st.error("❌ Por favor selecciona un alumno")
     
-    # Estado general del sistema
+    # Mostrar resumen de asistencia
     st.markdown("---")
-    st.subheader("📊 Estado del Sistema")
+    st.subheader("📊 Resumen de Asistencia")
     
-    col1, col2, col3 = st.columns(3)
+    trimestre_resumen = st.selectbox("📅 Trimestre para resumen:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="resumen_trimestre")
     
-    with col1:
-        if os.path.exists('google_drive_credentials.json'):
-            st.metric("📁 Archivo", "✅ Encontrado", delta="Configurado")
+    df_resumen = leer_datos_excel(trimestre_resumen)
+    
+    if not df_resumen.empty:
+        # Aplicar filtros
+        if curso_seleccionado != "Todos":
+            df_resumen = df_resumen[df_resumen["Curso"] == curso_seleccionado]
+        
+        if alumno_seleccionado != "Todos":
+            df_resumen = df_resumen[df_resumen["Apellido y Nombre"] == alumno_seleccionado]
+        
+        if not df_resumen.empty:
+            # Calcular estadísticas de asistencia
+            resumen_data = []
+            
+            for idx, row in df_resumen.iterrows():
+                if pd.notna(row["Apellido y Nombre"]):
+                    # Contar presentes y ausentes
+                    columnas_asistencia = [col for col in df_resumen.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dec-"])]
+                    
+                    presentes = 0
+                    totales = 0
+                    
+                    for col in columnas_asistencia:
+                        if pd.notna(row[col]):
+                            totales += 1
+                            if row[col] == "Presente":
+                                presentes += 1
+                    
+                    if totales > 0:
+                        porcentaje = (presentes / totales) * 100
+                        nota_asistencia = calcular_nota_asistencia(porcentaje)
+                        
+                        resumen_data.append({
+                            "Alumno": row["Apellido y Nombre"],
+                            "Curso": row["Curso"],
+                            "Días Presentes": presentes,
+                            "Total Días": totales,
+                            "% Asistencia": f"{porcentaje:.1f}%",
+                            "Nota Asistencia": nota_asistencia
+                        })
+            
+            if resumen_data:
+                df_resumen_final = pd.DataFrame(resumen_data)
+                st.dataframe(df_resumen_final, use_container_width=True)
+            else:
+                st.info("📋 No hay datos de asistencia para mostrar")
         else:
-            st.metric("📁 Archivo", "❌ No encontrado", delta="Requerido")
-    
-    with col2:
-        if os.path.exists('google_drive_credentials.json'):
-            st.metric("🔧 Configuración", "✅ Lista", delta="Funcionando")
-        else:
-            st.metric("🔧 Configuración", "❌ Pendiente", delta="Requerido")
-    
-    with col3:
-        st.metric("📧 Email Destino", "solpeschuk@gmail.com", delta="Configurado")
+            st.info("📋 No hay alumnos que coincidan con los filtros seleccionados")
 
-# Footer informativo
+# ==================== TAB 3: EVALUACIONES ====================
+with tab3:
+    st.header("📝 Gestión de Evaluaciones")
+    
+    # Formulario para agregar evaluaciones
+    with st.expander("📝 Agregar Evaluación"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            trimestre_eval = st.selectbox("📅 Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="eval_trimestre")
+            
+            # Obtener alumnos del trimestre
+            df_alumnos_eval = leer_datos_excel(trimestre_eval)
+            if not df_alumnos_eval.empty:
+                alumnos_eval_lista = df_alumnos_eval["Apellido y Nombre"].tolist()
+                alumno_eval = st.selectbox("👤 Alumno:", alumnos_eval_lista, key="eval_alumno")
+            else:
+                st.warning("⚠️ No hay alumnos registrados en este trimestre")
+                alumno_eval = None
+        
+        with col2:
+            tipo_evaluacion = st.selectbox("📋 Tipo Evaluación:", ["Diagnóstico", "Físico", "Técnico", "Desempeño global"], key="eval_tipo")
+        
+        with col3:
+            nombre_evaluacion = st.text_input("📝 Nombre Evaluación:", key="eval_nombre")
+            calificacion_eval = st.selectbox("📊 Calificación:", ["M", "R-", "R+", "B", "MB", "EX"], key="eval_calificacion")
+        
+        if st.button("📝 Agregar Evaluación", type="primary", key="agregar_evaluacion"):
+            if alumno_eval and nombre_evaluacion:
+                # Leer datos existentes
+                df_existente = leer_datos_excel(trimestre_eval)
+                
+                # Encontrar fila del alumno
+                alumno_fila = df_existente[df_existente["Apellido y Nombre"] == alumno_eval]
+                
+                if not alumno_fila.empty:
+                    # Obtener índice
+                    idx = alumno_fila.index[0]
+                    
+                    # Establecer tipo de evaluación
+                    df_existente.at[idx, "Tipo Evaluación"] = tipo_evaluacion
+                    
+                    # Buscar la primera columna de evaluación vacía
+                    eval_cols = [col for col in df_existente.columns if col.startswith("Eval ") and col != "Tipo Evaluación"]
+                    
+                    for i, col in enumerate(eval_cols[:6]):  # Máximo 6 evaluaciones
+                        calif_col = col.replace("Eval", "Calif")
+                        
+                        if pd.isna(df_existente.at[idx, col]) or df_existente.at[idx, col] == "":
+                            df_existente.at[idx, col] = nombre_evaluacion
+                            df_existente.at[idx, calif_col] = calificacion_eval
+                            break
+                    
+                    # Calcular nota final de evaluaciones
+                    calificaciones = []
+                    for col in eval_cols[:6]:
+                        calif_col = col.replace("Eval", "Calif")
+                        if pd.notna(df_existente.at[idx, calif_col]):
+                            calificaciones.append(calificacion_a_numero(df_existente.at[idx, calif_col]))
+                    
+                    if calificaciones:
+                        nota_final = sum(calificaciones) / len(calificaciones)
+                        df_existente.at[idx, "Nota Final Evaluaciones"] = round(nota_final, 2)
+                    
+                    # Guardar en Excel
+                    if guardar_datos_excel(df_existente, trimestre_eval):
+                        st.success(f"✅ Evaluación '{nombre_evaluacion}' agregada para {alumno_eval}")
+                        st.info(f"📊 Calificación: {calificacion_eval}")
+                        st.balloons()
+                        st.rerun()
+                else:
+                    st.error("❌ Alumno no encontrado")
+            else:
+                st.error("❌ Por favor completa todos los campos")
+    
+    # Mostrar resumen de evaluaciones
+    st.markdown("---")
+    st.subheader("📊 Resumen de Evaluaciones")
+    
+    trimestre_eval_resumen = st.selectbox("📅 Trimestre para resumen:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="eval_resumen_trimestre")
+    
+    df_eval_resumen = leer_datos_excel(trimestre_eval_resumen)
+    
+    if not df_eval_resumen.empty:
+        # Aplicar filtros
+        if curso_seleccionado != "Todos":
+            df_eval_resumen = df_eval_resumen[df_eval_resumen["Curso"] == curso_seleccionado]
+        
+        if alumno_seleccionado != "Todos":
+            df_eval_resumen = df_eval_resumen[df_eval_resumen["Apellido y Nombre"] == alumno_seleccionado]
+        
+        if not df_eval_resumen.empty:
+            # Preparar datos de evaluaciones
+            eval_data = []
+            
+            for idx, row in df_eval_resumen.iterrows():
+                if pd.notna(row["Apellido y Nombre"]):
+                    # Obtener evaluaciones
+                    eval_cols = [col for col in df_eval_resumen.columns if col.startswith("Eval ") and col != "Tipo Evaluación"]
+                    
+                    for i, col in enumerate(eval_cols[:6]):  # Máximo 6 evaluaciones
+                        calif_col = col.replace("Eval", "Calif")
+                        
+                        if pd.notna(row[col]) and pd.notna(row[calif_col]):
+                            eval_data.append({
+                                "Alumno": row["Apellido y Nombre"],
+                                "Curso": row["Curso"],
+                                "Tipo Evaluación": row.get("Tipo Evaluación", ""),
+                                "Evaluación": row[col],
+                                "Calificación": row[calif_col],
+                                "Nota Numérica": calificacion_a_numero(row[calif_col])
+                            })
+            
+            if eval_data:
+                df_eval_final = pd.DataFrame(eval_data)
+                st.dataframe(df_eval_final, use_container_width=True)
+                
+                # Estadísticas de evaluaciones
+                st.markdown("---")
+                st.subheader("📈 Estadísticas de Evaluaciones")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    total_eval = len(df_eval_final)
+                    st.metric("📝 Total Evaluaciones", total_eval)
+                
+                with col2:
+                    promedio = df_eval_final["Nota Numérica"].mean()
+                    st.metric("📊 Promedio General", f"{promedio:.2f}")
+                
+                with col3:
+                    max_nota = df_eval_final["Nota Numérica"].max()
+                    st.metric("🏆 Nota Máxima", f"{max_nota:.2f}")
+                
+                with col4:
+                    min_nota = df_eval_final["Nota Numérica"].min()
+                    st.metric("📉 Nota Mínima", f"{min_nota:.2f}")
+            else:
+                st.info("📋 No hay evaluaciones registradas")
+        else:
+            st.info("📋 No hay alumnos que coincidan con los filtros seleccionados")
+
+# Información del archivo
 st.markdown("---")
-footer_html = """
+st.subheader("📁 Información del Archivo")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if os.path.exists("sistema_educativo.xlsx"):
+        st.success("✅ Archivo Excel creado")
+        st.info("📁 Nombre: sistema_educativo.xlsx")
+    else:
+        st.warning("⚠️ Archivo no encontrado")
+
+with col2:
+    st.info("📂 Ubicación: Mis Documentos")
+    st.info("🔄 Auto-backup: Activo")
+
+with col3:
+    st.info("📊 Total trimestres: 3")
+    st.info("📅 Periodo: Mar-Dic")
+
+# Footer
+st.markdown("---")
+st.markdown("""
 <div style='text-align: center; color: #2E7D32; padding: 20px; border-top: 2px solid #4CAF50; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);'>
-    <h2 style='color: white; margin-bottom: 10px;'>🎓 Sistema Integral IES - Plataforma Completa</h2>
+    <h2 style='color: white; margin-bottom: 10px;'>📚 Sistema de Gestión Educativa</h2>
     <p style='color: white; font-size: 16px; margin: 5px 0;'>
-        <span style='color: #4CAF50;'>✅</span> Dashboard con métricas y filtros<br>
-        <span style='color: #4CAF50;'>👥</span> Gestión de alumnos completa<br>
-        <span style='color: #4CAF50;'>📋</span> Sistema de asistencia<br>
-        <span style='color: #4CAF50;'>📝</span> Evaluaciones y reportes<br>
-        <span style='color: #4CAF50;'>💾</span> Backup automático en Google Drive
+        <span style='color: #4CAF50;'>✅</span> Gestión completa de alumnos<br>
+        <span style='color: #4CAF50;'>📋</span> Control de asistencia por trimestres<br>
+        <span style='color: #4CAF50;'>📝</span> Sistema de evaluaciones<br>
+        <span style='color: #4CAF50;'>📁</span> Backup automático en Excel
     </p>
-    <small style='color: rgba(255,255,255,0.8);'>Sistema educativo integral y funcional</small>
+    <small style='color: rgba(255,255,255,0.8);'>Sistema educativo completo y funcional</small>
 </div>
-"""
-st.markdown(footer_html, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
