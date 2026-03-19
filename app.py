@@ -1477,6 +1477,29 @@ elif st.session_state.accion_actual == "estadistica":
     st.markdown("---")
     
     # Selector de período
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        curso_stats = st.selectbox(
+            "📂 Curso:",
+            ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"],
+            key="stats_curso"
+        )
+    with col2:
+        trimestre_stats = st.selectbox(
+            "📅 Trimestre:",
+            ["1 Trimestre", "2 Trimestre", "3 Trimestre"],
+            key="stats_trimestre"
+        )
+    with col3:
+        alumnos_disponibles = obtener_alumnos_disponibles()
+        alumno_stats = st.selectbox(
+            "👤 Alumno:",
+            alumnos_disponibles,
+            key="stats_alumno"
+        )
+
+    st.markdown("---")
     st.markdown("#### 📅 Filtrar por período")
     col_p1, col_p2, col_p3 = st.columns(3)
     with col_p1:
