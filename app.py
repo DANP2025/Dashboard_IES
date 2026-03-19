@@ -9,6 +9,14 @@ import random
 
 st.set_page_config(page_title="Sistema Educativo", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
 
+# Verificar si los secrets están disponibles
+GOOGLE_SHEETS_DISPONIBLE = False
+try:
+    if "gcp_service_account" in st.secrets:
+        GOOGLE_SHEETS_DISPONIBLE = True
+except Exception:
+    GOOGLE_SHEETS_DISPONIBLE = False
+
 # Sidebar con ACCIONES
 st.sidebar.header("🎯 ACCIONES")
 
@@ -62,6 +70,9 @@ if 'nuevas_evaluaciones' not in st.session_state:
 def sincronizar_google_sheets():
     """Sincroniza los datos locales con Google Sheets"""
     try:
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return False, "Secrets de Google no configurados"
+        
         import gspread
         from google.oauth2.service_account import Credentials
 
