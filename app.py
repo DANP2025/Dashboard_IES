@@ -321,22 +321,28 @@ def sincronizar_google_sheets():
 
 def restaurar_desde_sheets_si_vacio():
     """Si el Excel local está vacío, restaura desde Google Sheets"""
+    archivo_excel_local = "sistema_educativo.xlsx"
     try:
         if not GOOGLE_SHEETS_DISPONIBLE:
             return False
-        wb_check = openpyxl.load_workbook(archivo_excel)
+        if not os.path.exists(archivo_excel_local):
+            return False
+
+        wb_check = openpyxl.load_workbook(archivo_excel_local)
         ws_check = wb_check["1 Trimestre"]
         tiene_datos = ws_check.max_row > 1
         wb_check.close()
+
         if tiene_datos:
             return False
 
+        # Excel vacío — restaurar desde Sheets
         restaurado = False
         for trimestre_num in range(1, 4):
             nombre_trimestre = f"{trimestre_num} Trimestre"
             df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
             if df_sheets is not None and not df_sheets.empty:
-                guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel)
+                guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel_local)
                 restaurado = True
         return restaurado
     except Exception:
