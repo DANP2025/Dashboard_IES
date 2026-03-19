@@ -890,7 +890,20 @@ elif st.session_state.accion_actual == "asistencia":
     st.subheader("📋 Registro de Asistencia - Marcar Rápidamente")
     
     try:
+        # Intentar leer desde Excel local
         df_asistencia = pd.read_excel(archivo_excel, sheet_name=trimestre_asistencia)
+        # Si está vacío, intentar desde Sheets
+        if df_asistencia.empty and GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_asistencia)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, trimestre_asistencia, archivo_excel)
+                df_asistencia = df_sheets
+    except Exception:
+        df_asistencia = pd.DataFrame()
+        if GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_asistencia)
+            if df_sheets is not None and not df_sheets.empty:
+                df_asistencia = df_sheets
         
         if curso_asistencia != "Todos":
             df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
@@ -1083,12 +1096,42 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.markdown("---")
     
     try:
+        # Intentar leer desde Excel local
         df_evaluaciones = pd.read_excel(archivo_excel, sheet_name=trimestre_eval)
+        # Si está vacío, intentar desde Sheets
+        if df_evaluaciones.empty and GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_eval)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, trimestre_eval, archivo_excel)
+                df_evaluaciones = df_sheets
+    except Exception:
+        df_evaluaciones = pd.DataFrame()
+        if GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_eval)
+            if df_sheets is not None and not df_sheets.empty:
+                df_evaluaciones = df_sheets
         
         if curso_eval != "Todos":
             df_evaluaciones = df_evaluaciones[df_evaluaciones["Curso"] == curso_eval]
         
         if not df_evaluaciones.empty:
+            # Resumen de evaluaciones cargadas
+            total_alumnos_eval = len(df_evaluaciones[df_evaluaciones["Apellido y Nombre"].notna()])
+            total_evals = 0
+            for _, row in df_evaluaciones.iterrows():
+                for j in range(1, 7):
+                    if pd.notna(row.get(f"Eval {j}")) and pd.notna(row.get(f"Calif {j}")):
+                        total_evals += 1
+
+            col_i1, col_i2, col_i3 = st.columns(3)
+            with col_i1:
+                st.metric("👥 Alumnos cargados", total_alumnos_eval)
+            with col_i2:
+                st.metric("📝 Evaluaciones totales", total_evals)
+            with col_i3:
+                st.metric("📅 Trimestre activo", trimestre_eval)
+            st.markdown("---")
+            
             st.write("📝 **Evaluaciones** - Formato consistente (nombre arriba, nombre abajo)")
             
             if 'evaluaciones_cambios' not in st.session_state:
@@ -1291,7 +1334,20 @@ elif st.session_state.accion_actual == "reporte":
     st.markdown("---")
     
     try:
+        # Intentar leer desde Excel local
         df_reporte = pd.read_excel(archivo_excel, sheet_name=trimestre_reporte)
+        # Si está vacío, intentar desde Sheets
+        if df_reporte.empty and GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_reporte)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, trimestre_reporte, archivo_excel)
+                df_reporte = df_sheets
+    except Exception:
+        df_reporte = pd.DataFrame()
+        if GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_reporte)
+            if df_sheets is not None and not df_sheets.empty:
+                df_reporte = df_sheets
         
         if curso_reporte != "Todos":
             df_reporte = df_reporte[df_reporte["Curso"] == curso_reporte]
@@ -1474,12 +1530,29 @@ elif st.session_state.accion_actual == "estadistica":
     st.markdown("---")
 
     try:
+        # Intentar leer desde Excel local
         df_stats = pd.read_excel(archivo_excel, sheet_name=trimestre_stats)
+        # Si está vacío, intentar desde Sheets
+        if df_stats.empty and GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_stats)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, trimestre_stats, archivo_excel)
+                df_stats = df_sheets
 
         if curso_stats != "Todos":
             df_stats = df_stats[df_stats["Curso"] == curso_stats]
         if alumno_stats != "Todos":
             df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
+    except Exception:
+        df_stats = pd.DataFrame()
+        if GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_stats)
+            if df_sheets is not None and not df_sheets.empty:
+                df_stats = df_sheets
+                if curso_stats != "Todos":
+                    df_stats = df_stats[df_stats["Curso"] == curso_stats]
+                if alumno_stats != "Todos":
+                    df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
 
         if not df_stats.empty:
             for idx, row in df_stats.iterrows():
