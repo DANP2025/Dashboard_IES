@@ -23,10 +23,11 @@ st.write("🚀 Configuración segura vía Streamlit Secrets")
 try:
     CREDENTIALS = dict(st.secrets["gcp_service_account"])
     CREDENTIALS["private_key"] = CREDENTIALS["private_key"].replace("\\n", "\n")
-    FOLDER_ID = st.secrets["folder_id"]
+    # ✅ CORRECCIÓN: folder_id está dentro del bloque [gcp_service_account]
+    FOLDER_ID = CREDENTIALS.pop("folder_id")
     st.success("✅ Credenciales cargadas correctamente!")
     st.info(f"📧 Email: {CREDENTIALS['client_email']}")
-    st.info(f"📁 Carpeta destino configurada")
+    st.info(f"📁 Carpeta destino configurada: {FOLDER_ID}")
 except Exception as e:
     st.error(f"❌ Error cargando credenciales: {e}")
     st.stop()
