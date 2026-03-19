@@ -23,7 +23,26 @@ def crear_excel_si_no_existe():
         wb.remove(wb.active)
         for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
             ws = wb.create_sheet(title=trimestre)
-            headers = ["Apellido y Nombre", "Curso"] + [f"Mar-{i:02d}" for i in range(1, 32)] + [f"Abr-{i:02d}" for i in range(1, 31)] + [f"May-{i:02d}" for i in range(1, 32)] + ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6", "Nota Final Evaluaciones", "Observaciones"]
+            if trimestre == "1 Trimestre":
+                dias_asistencia = (
+                    [f"Mar-{i:02d}" for i in range(1, 32)] +
+                    [f"Abr-{i:02d}" for i in range(1, 31)] +
+                    [f"May-{i:02d}" for i in range(1, 32)]
+                )
+            elif trimestre == "2 Trimestre":
+                dias_asistencia = (
+                    [f"Jun-{i:02d}" for i in range(1, 31)] +
+                    [f"Jul-{i:02d}" for i in range(1, 32)] +
+                    [f"Ago-{i:02d}" for i in range(1, 32)] +
+                    [f"Sep-{i:02d}" for i in range(1, 31)]
+                )
+            elif trimestre == "3 Trimestre":
+                dias_asistencia = (
+                    [f"Oct-{i:02d}" for i in range(1, 32)] +
+                    [f"Nov-{i:02d}" for i in range(1, 31)] +
+                    [f"Dic-{i:02d}" for i in range(1, 32)]
+                )
+            headers = ["Apellido y Nombre", "Curso"] + dias_asistencia + ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6", "Nota Final Evaluaciones", "Observaciones"]
             for col_num, header in enumerate(headers, 1):
                 cell = ws.cell(row=1, column=col_num, value=header)
                 cell.font = Font(bold=True)
@@ -92,7 +111,7 @@ def generar_backup_detalles():
                 row_num = 2
                 for idx, row in df_trimestre.iterrows():
                     if pd.notna(row["Apellido y Nombre"]):
-                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
                         presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
                         totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
                         porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
@@ -262,7 +281,7 @@ def sincronizar_google_sheets():
 
                 columnas_asistencia = [
                     col for col in df.columns
-                    if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-"])
+                    if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])
                 ]
                 presentes = sum(
                     1 for col in columnas_asistencia
@@ -424,12 +443,32 @@ def agregar_datos_simulados_completos():
                         "Tipo Evaluación": "Diagnóstico"
                     }
 
-                    for dia in range(1, 32):
-                        nueva_fila[f"Mar-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
-                    for dia in range(1, 31):
-                        nueva_fila[f"Abr-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
-                    for dia in range(1, 32):
-                        nueva_fila[f"May-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                    # Trimestre 1: Mar-May
+                    if nombre_trimestre == "1 Trimestre":
+                        for dia in range(1, 32):
+                            nueva_fila[f"Mar-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 31):
+                            nueva_fila[f"Abr-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 32):
+                            nueva_fila[f"May-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                    # Trimestre 2: Jun-Sep
+                    elif nombre_trimestre == "2 Trimestre":
+                        for dia in range(1, 31):
+                            nueva_fila[f"Jun-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 32):
+                            nueva_fila[f"Jul-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 32):
+                            nueva_fila[f"Ago-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 31):
+                            nueva_fila[f"Sep-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                    # Trimestre 3: Oct-Dic
+                    elif nombre_trimestre == "3 Trimestre":
+                        for dia in range(1, 32):
+                            nueva_fila[f"Oct-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 31):
+                            nueva_fila[f"Nov-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 32):
+                            nueva_fila[f"Dic-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
 
                     califs_alumno = []
                     for i in range(1, 7):
@@ -468,7 +507,7 @@ def agregar_nuevo_alumno(nombre, curso):
                 "Tipo Evaluación": "Diagnóstico"
             }
             
-            columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+            columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
             for col in columnas_asistencia:
                 nueva_fila[col] = "Ausente"
             
@@ -660,7 +699,7 @@ if st.session_state.accion_actual == "dashboard":
                 total_alumnos_real += n_alumnos
 
                 # Asistencia del curso
-                cols_asist = [c for c in df_c.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                cols_asist = [c for c in df_c.columns if any(m in c for m in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
                 presentes_curso = sum(
                     1 for _, r in df_c.iterrows()
                     for c in cols_asist
@@ -779,9 +818,10 @@ elif st.session_state.accion_actual == "asistencia":
 
     if not df_asistencia.empty:
         meses_es = {
-            "Jan": "Jan", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
-            "May": "May", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
-            "Sep": "Sep", "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
+            "Jan": "Ene", "Feb": "Feb", "Mar": "Mar",
+            "Apr": "Abr", "May": "May", "Jun": "Jun",
+            "Jul": "Jul", "Aug": "Ago", "Sep": "Sep",
+            "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
         }
         mes_en = fecha_seleccionada.strftime("%b")
         mes = meses_es.get(mes_en, mes_en)
@@ -885,7 +925,7 @@ elif st.session_state.accion_actual == "asistencia":
                                 cambios_guardados += 1
                                 registrar_cambio("Asistencia", df_asistencia.at[idx, "Apellido y Nombre"], df_asistencia.at[idx, "Curso"], trimestre_asistencia, fecha_str, "anterior", "Presente" if presente else "Ausente")
 
-                        columnas_asist = [c for c in df_asistencia.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                        columnas_asist = [c for c in df_asistencia.columns if any(m in c for m in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
                         for idx, row in df_asistencia.iterrows():
                             if pd.notna(row.get("Apellido y Nombre")):
                                 p = sum(1 for c in columnas_asist if pd.notna(row.get(c)) and row.get(c) == "Presente")
@@ -1356,7 +1396,7 @@ elif st.session_state.accion_actual == "agregar_alumno":
                         if mask.any():
                             df_tc.loc[mask, fecha_str_corr] = nuevo_estado
                             # Recalcular nota asistencia
-                            columnas_a = [c for c in df_tc.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                            columnas_a = [c for c in df_tc.columns if any(m in c for m in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
                             for i, row in df_tc.iterrows():
                                 if pd.notna(row.get("Apellido y Nombre")):
                                     p = sum(1 for c in columnas_a if pd.notna(row.get(c)) and row.get(c) == "Presente")
@@ -1528,7 +1568,7 @@ elif st.session_state.accion_actual == "estadistica":
             
             if not df_vc.empty:
                 resumen_curso = []
-                cols_a = [c for c in df_vc.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                cols_a = [c for c in df_vc.columns if any(m in c for m in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
                 
                 for _, row in df_vc.iterrows():
                     if pd.notna(row.get("Apellido y Nombre")):
@@ -1621,7 +1661,7 @@ elif st.session_state.accion_actual == "estadistica":
                         elif periodo == "Mayo":
                             prefijos = ["May-"]
                         else:
-                            prefijos = ["Mar-", "Abr-", "May-"]
+                            prefijos = ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"]
 
                         columnas_asistencia = [
                             col for col in df_stats.columns
@@ -1812,7 +1852,7 @@ elif st.session_state.accion_actual == "reporte":
                     st.markdown("---")
                     
                     st.write("## 📋 Asistencia Detallada")
-                    columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                    columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-", "Jun-", "Jul-", "Ago-", "Sep-", "Oct-", "Nov-", "Dic-"])]
                     asistencia_data = []
                     presentes = 0
                     ausentes = 0
