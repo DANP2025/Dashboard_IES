@@ -1069,21 +1069,20 @@ elif st.session_state.accion_actual == "evaluaciones":
         st.info("📋 No hay alumnos. Primero agregá datos simulados desde el Dashboard.")
 
 elif st.session_state.accion_actual == "agregar_alumno":
-    st.header("👤 Agregar Nuevo Alumno")
+    st.header("👤 Gestión de Alumnos")
     st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        nuevo_nombre = st.text_input("📝 Nombre Completo del Alumno:", key="nuevo_nombre_alumno")
-    with col2:
-        nuevo_curso = st.selectbox("📂 Curso:", ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="nuevo_curso_alumno")
-    with col3:
-        st.write("")
-    
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
+
+    tab1, tab2, tab3 = st.tabs(["➕ Agregar Alumno", "✏️ Editar / Corregir", "🗑️ Eliminar Alumno"])
+
+    # ── TAB 1: AGREGAR ──────────────────────────────────
+    with tab1:
+        st.subheader("➕ Agregar Nuevo Alumno")
+        col1, col2 = st.columns(2)
+        with col1:
+            nuevo_nombre = st.text_input("📝 Nombre Completo:", key="nuevo_nombre_alumno", placeholder="Ej: García López, Sofía")
+        with col2:
+            nuevo_curso = st.selectbox("📂 Curso:", ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="nuevo_curso_alumno")
+
         if st.button("➕ Agregar Alumno", type="primary", key="btn_agregar_alumno_def"):
             if nuevo_nombre and nuevo_curso:
                 if agregar_nuevo_alumno(nuevo_nombre, nuevo_curso):
@@ -1093,21 +1092,197 @@ elif st.session_state.accion_actual == "agregar_alumno":
                     st.error("❌ Error agregando alumno")
             else:
                 st.error("❌ Completá todos los campos")
-    with col2:
-        st.write("")
-    with col3:
-        st.write("")
-    
-    st.markdown("---")
-    st.write("📋 **Alumnos Actuales:**")
-    try:
-        df_alumnos = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
-        if not df_alumnos.empty:
-            for idx, row in df_alumnos.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    st.write(f"👤 {row['Apellido y Nombre']} - 📂 {row['Curso']}")
-    except Exception as e:
-        st.error(f"Error: {e}")
+
+        st.markdown("---")
+        st.write("📋 **Alumnos Actuales:**")
+        try:
+            df_alumnos = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+            if not df_alumnos.empty:
+                for _, row in df_alumnos.iterrows():
+                    if pd.notna(row.get("Apellido y Nombre")):
+                        st.write(f"👤 {row['Apellido y Nombre']} — 📂 {row['Curso']}")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+    # ── TAB 2: EDITAR / CORREGIR ─────────────────────────
+    with tab2:
+        st.subheader("✏️ Corregir nombre de alumno")
+        st.info("Usá esta sección si te equivocaste al escribir el nombre de un alumno.")
+
+        try:
+            df_edit = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+            alumnos_lista = df_edit["Apellido y Nombre"].dropna().tolist()
+
+            if alumnos_lista:
+                alumno_a_editar = st.selectbox(
+                    "👤 Seleccioná el alumno a corregir:",
+                    alumnos_lista,
+                    key="edit_alumno_select"
+                )
+                nombre_corregido = st.text_input(
+                    "📝 Nombre correcto:",
+                    value=alumno_a_editar,
+                    key="edit_nombre_nuevo"
+                )
+
+                if st.button("💾 Guardar Corrección", type="primary", key="btn_guardar_correccion"):
+                    if nombre_corregido and nombre_corregido != alumno_a_editar:
+                        try:
+                            correcciones = 0
+                            for trimestre_num in range(1, 4):
+                                nombre_trimestre = f"{trimestre_num} Trimestre"
+                                df_t = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+                                mask = df_t["Apellido y Nombre"] == alumno_a_editar
+                                if mask.any():
+                                    df_t.loc[mask, "Apellido y Nombre"] = nombre_corregido
+                                    guardar_datos_excel(df_t, nombre_trimestre, archivo_excel)
+                                    correcciones += 1
+                            if correcciones > 0:
+                                with st.spinner("Sincronizando..."):
+                                    sincronizar_google_sheets()
+                                st.success(f"✅ Nombre corregido en {correcciones} trimestres!")
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ No se encontró el alumno")
+                        except Exception as e:
+                            st.error(f"❌ Error: {e}")
+                    else:
+                        st.warning("⚠️ El nombre es igual al actual")
+            else:
+                st.info("No hay alumnos cargados")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+        st.markdown("---")
+        st.subheader("✏️ Corregir asistencia de un día")
+        st.info("Si marcaste mal la asistencia de un día ya guardado, usá esta sección.")
+
+        try:
+            df_corr = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+            alumnos_corr = df_corr["Apellido y Nombre"].dropna().tolist()
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                trimestre_corr = st.selectbox(
+                    "📅 Trimestre:",
+                    ["1 Trimestre", "2 Trimestre", "3 Trimestre"],
+                    key="corr_trimestre"
+                )
+            with col2:
+                alumno_corr = st.selectbox(
+                    "👤 Alumno:",
+                    alumnos_corr if alumnos_corr else ["Sin datos"],
+                    key="corr_alumno"
+                )
+            with col3:
+                fecha_corr = st.date_input(
+                    "📅 Fecha a corregir:",
+                    value=datetime.now().date(),
+                    key="corr_fecha"
+                )
+
+            meses_es_c = {
+                "Jan": "Jan", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
+                "May": "May", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
+                "Sep": "Sep", "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
+            }
+            mes_c = meses_es_c.get(fecha_corr.strftime("%b"), fecha_corr.strftime("%b"))
+            fecha_str_corr = f"{mes_c}-{fecha_corr.strftime('%d')}"
+
+            nuevo_estado = st.radio(
+                "Estado correcto:",
+                ["Presente", "Ausente"],
+                horizontal=True,
+                key="corr_estado"
+            )
+
+            if st.button("💾 Corregir Asistencia", type="primary", key="btn_corregir_asistencia"):
+                try:
+                    df_tc = pd.read_excel(archivo_excel, sheet_name=trimestre_corr)
+                    if fecha_str_corr in df_tc.columns:
+                        mask = df_tc["Apellido y Nombre"] == alumno_corr
+                        if mask.any():
+                            df_tc.loc[mask, fecha_str_corr] = nuevo_estado
+                            # Recalcular nota asistencia
+                            columnas_a = [c for c in df_tc.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
+                            for i, row in df_tc.iterrows():
+                                if pd.notna(row.get("Apellido y Nombre")):
+                                    p = sum(1 for c in columnas_a if pd.notna(row.get(c)) and row.get(c) == "Presente")
+                                    t = sum(1 for c in columnas_a if pd.notna(row.get(c)))
+                                    df_tc.at[i, "Nota Asistencia"] = calcular_nota_asistencia(p, t)
+                            guardar_datos_excel(df_tc, trimestre_corr, archivo_excel)
+                            with st.spinner("Sincronizando..."):
+                                sincronizar_google_sheets()
+                            st.success(f"✅ {alumno_corr} — {fecha_str_corr} corregido a {nuevo_estado}!")
+                        else:
+                            st.warning("⚠️ Alumno no encontrado")
+                    else:
+                        st.warning(f"⚠️ La fecha {fecha_str_corr} no existe en los registros")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+        except Exception as e:
+            st.error(f"Error cargando datos: {e}")
+
+    # ── TAB 3: ELIMINAR ──────────────────────────────────
+    with tab3:
+        st.subheader("🗑️ Eliminar Alumno")
+        st.warning("⚠️ Esta acción elimina al alumno de los 3 trimestres y no se puede deshacer.")
+
+        try:
+            df_del = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+            alumnos_del = df_del["Apellido y Nombre"].dropna().tolist()
+
+            if alumnos_del:
+                col1, col2 = st.columns(2)
+                with col1:
+                    alumno_a_eliminar = st.selectbox(
+                        "👤 Seleccioná el alumno a eliminar:",
+                        alumnos_del,
+                        key="del_alumno_select"
+                    )
+                with col2:
+                    curso_del = st.selectbox(
+                        "📂 Curso (para confirmar):",
+                        ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"],
+                        key="del_curso_confirm"
+                    )
+
+                confirmar = st.text_input(
+                    "✍️ Escribí ELIMINAR para confirmar:",
+                    key="del_confirmar",
+                    placeholder="ELIMINAR"
+                )
+
+                if st.button("🗑️ Eliminar Alumno", type="primary", key="btn_eliminar_alumno"):
+                    if confirmar == "ELIMINAR":
+                        try:
+                            eliminados = 0
+                            for trimestre_num in range(1, 4):
+                                nombre_trimestre = f"{trimestre_num} Trimestre"
+                                df_t = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+                                mask = (
+                                    (df_t["Apellido y Nombre"] == alumno_a_eliminar) &
+                                    (df_t["Curso"] == curso_del)
+                                )
+                                if mask.any():
+                                    df_t = df_t[~mask].reset_index(drop=True)
+                                    guardar_datos_excel(df_t, nombre_trimestre, archivo_excel)
+                                    eliminados += 1
+                            if eliminados > 0:
+                                with st.spinner("Sincronizando..."):
+                                    sincronizar_google_sheets()
+                                st.success(f"✅ '{alumno_a_eliminar}' eliminado de {eliminados} trimestres!")
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ No se encontró el alumno en ese curso")
+                        except Exception as e:
+                            st.error(f"❌ Error: {e}")
+                    else:
+                        st.error("❌ Escribí ELIMINAR para confirmar")
+            else:
+                st.info("No hay alumnos cargados")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 elif st.session_state.accion_actual == "estadistica":
     st.markdown("""
