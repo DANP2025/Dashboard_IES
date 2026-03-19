@@ -436,38 +436,30 @@ def agregar_datos_simulados_completos():
                         else:
                             nota_asistencia = 5
                         
-                        tipos_eval = ["Diagnóstico", "Físico", "Técnico", "Desempeño global"]
-                        calificaciones = ["M", "R-", "R+", "B", "MB", "EX"]
-                        nombres_eval = ["Evaluación Diagnóstica", "Test Físico", "Proyecto Técnico", "Evaluación Global", "Trabajo Práctico", "Exposición Oral"]
-                        
-                        evaluacion_data = {
+                        alumno_data = {
                             "Apellido y Nombre": nombre,
                             "Curso": curso,
                             "Nota Asistencia": nota_asistencia,
-                            "Tipo Evaluación": tipos_eval[i % 4],
-                            "Observaciones": f"Alumna {curso}, desempeño {'excelente' if nota_asistencia >= 8 else 'regular' if nota_asistencia >= 6 else 'necesita mejorar'}"
+                            "Tipo Evaluación": "Diagnóstico"
                         }
+                        alumno_data.update(asistencia_data)
                         
                         for j in range(1, 7):
-                            eval_nombre = nombres_eval[j-1]
-                            eval_calif = random.choice(calificaciones)
-                            evaluacion_data[f"Eval {j}"] = eval_nombre
-                            evaluacion_data[f"Calif {j}"] = eval_calif
+                            eval_col = f"Eval {j}"
+                            calif_col = f"Calif {j}"
+                            alumno_data[eval_col] = f"Evaluación {j}"
+                            alumno_data[calif_col] = "B"
                         
-                        califs_numericas = []
-                        for j in range(1, 7):
-                            calif = evaluacion_data[f"Calif {j}"]
-                            if calif == "M": califs_numericas.append(4)
-                            elif calif == "R-": califs_numericas.append(6)
-                            elif calif == "R+": califs_numericas.append(7)
-                            elif calif == "B": califs_numericas.append(8)
-                            elif calif == "MB": califs_numericas.append(9)
-                            elif calif == "EX": califs_numericas.append(10)
+                        calificaciones = []
+                        for i in range(1, 7):
+                            calif_col_temp = f"Calif {i}"
+                            if calif_col_temp in alumno_data:
+                                calificaciones.append(calificacion_a_numero(alumno_data[calif_col_temp]))
                         
-                        promedio_final = sum(califs_numericas) / len(califs_numericas) if califs_numericas else 0
-                        evaluacion_data["Nota Final Evaluaciones"] = round(promedio_final, 1)
+                        promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
+                        alumno_data["Nota Final Evaluaciones"] = round(promedio_final, 1)
                         
-                        datos_alumna = {**asistencia_data, **evaluacion_data}
+                        datos_trimestre.append(alumno_data)
                         datos_trimestre.append(datos_alumna)
                 
                 df_trimestre = pd.DataFrame(datos_trimestre)
