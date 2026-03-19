@@ -781,7 +781,7 @@ if st.session_state.accion_actual == "dashboard":
         if st.button("🔄 Actualizar Dashboard", type="secondary"):
             st.rerun()
     with col3:
-        st.write()
+        st.write("")
 
 elif st.session_state.accion_actual == "asistencia":
     st.header("📋 Gestión de Asistencia")
@@ -1880,21 +1880,33 @@ elif st.session_state.accion_actual == "reporte":
                             "Dic": (12, 2026)
                         }
 
-                        # Organizar por mes excluyendo sábados y domingos
-                        meses = {k: [] for k in mes_a_numero.keys()}
+                        # Meses según trimestre seleccionado
+                        if trimestre_reporte == "1 Trimestre":
+                            meses_del_trimestre = ["Mar", "Abr", "May"]
+                        elif trimestre_reporte == "2 Trimestre":
+                            meses_del_trimestre = ["Jun", "Jul", "Ago", "Sep"]
+                        else:
+                            meses_del_trimestre = ["Oct", "Nov", "Dic"]
+
+                        mes_a_num = {
+                            "Mar": 3, "Abr": 4, "May": 5,
+                            "Jun": 6, "Jul": 7, "Ago": 8, "Sep": 9,
+                            "Oct": 10, "Nov": 11, "Dic": 12
+                        }
+
+                        meses = {k: [] for k in meses_del_trimestre}
                         for item in asistencia_data:
                             fecha_col = item["Fecha"]
-                            for mes_prefix, (mes_num, anio) in mes_a_numero.items():
+                            for mes_prefix in meses_del_trimestre:
                                 if fecha_col.startswith(mes_prefix):
                                     dia = int(fecha_col.split("-")[1])
                                     try:
                                         from datetime import date as dt_date
-                                        fecha_obj = dt_date(anio, mes_num, dia)
-                                        # 5=sábado, 6=domingo
+                                        fecha_obj = dt_date(2026, mes_a_num[mes_prefix], dia)
                                         if fecha_obj.weekday() < 5:
                                             meses[mes_prefix].append((dia, item["Estado"]))
                                     except ValueError:
-                                        pass  # día inválido para ese mes
+                                        pass
 
                         nombres_meses = {
                             "Mar": "Marzo", "Abr": "Abril", "May": "Mayo",
@@ -1944,7 +1956,7 @@ elif st.session_state.accion_actual == "reporte":
                         with col3:
                             st.metric("📊 Porcentaje", f"{porcentaje:.1f}%")
                         with col4:
-                            st.metric("� Nota", nota_asistencia)
+                            st.metric("📝 Nota asistencia", nota_asistencia)
                     
                     st.markdown("---")
                     st.write("## 📝 Evaluaciones Detalladas")
