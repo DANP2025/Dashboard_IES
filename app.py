@@ -80,8 +80,8 @@ st.sidebar.markdown("---")
 if st.sidebar.button("🗑️ Limpiar Datos de Ejemplo", type="secondary", help="Elimina todos los datos de ejemplo para empezar con datos reales"):
     st.sidebar.warning("⚠️ Esta función eliminará todos los datos de ejemplo")
 
-# Sistema de navegación por pestañas principales
-tab1, tab2, tab3, tab4 = st.tabs([
+# Sistema de navegación por pestañas principales - CORREGIDO: 3 pestañas en lugar de 4
+tab1, tab2, tab3 = st.tabs([
     "📊 Dashboard General", 
     "👥 Gestión de Alumnos", 
     "📈 Reportes y Estadísticas"
