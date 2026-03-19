@@ -531,6 +531,58 @@ if 'accion_actual' not in st.session_state:
 if 'nuevas_evaluaciones' not in st.session_state:
     st.session_state.nuevas_evaluaciones = []
 
+def registrar_cambio(tipo, alumno, curso, trimestre, campo, valor_anterior, valor_nuevo):
+    """Registra cada cambio en una hoja de historial en Google Sheets"""
+    try:
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        creds_info = {
+            "type": st.secrets["gcp_service_account"]["type"],
+            "project_id": st.secrets["gcp_service_account"]["project_id"],
+            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+            "private_key": st.secrets["gcp_service_account"]["private_key"],
+            "client_email": st.secrets["gcp_service_account"]["client_email"],
+            "client_id": st.secrets["gcp_service_account"]["client_id"],
+            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+        }
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        client = gspread.authorize(creds)
+        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+
+        # Obtener o crear hoja Historial
+        try:
+            ws = spreadsheet.worksheet("Historial de Cambios")
+        except Exception:
+            ws = spreadsheet.add_worksheet(title="Historial de Cambios", rows=2000, cols=8)
+            ws.append_row([
+                "Fecha y Hora", "Tipo", "Alumno", "Curso",
+                "Trimestre", "Campo", "Valor Anterior", "Valor Nuevo"
+            ])
+            ws.format("A1:H1", {
+                "backgroundColor": {"red": 0.118, "green": 0.227, "blue": 0.373},
+                "textFormat": {"bold": True, "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}},
+                "horizontalAlignment": "CENTER"
+            })
+
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        ws.append_row([
+            timestamp, tipo, alumno, curso,
+            trimestre, campo, str(valor_anterior), str(valor_nuevo)
+        ])
+    except Exception:
+        pass  # No interrumpir el flujo si falla el historial
+
 archivo_excel = crear_excel_si_no_existe()
 
 # Sidebar con botones de navegación
@@ -561,6 +613,9 @@ if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backu
             st.sidebar.error("❌ Error generando backup Excel")
     except Exception as e:
         st.sidebar.error(f"❌ Error Excel: {e}")
+
+if st.sidebar.button("📜 Ver Historial", type="secondary", key="btn_historial"):
+    st.session_state.accion_actual = "historial"
 
     with st.sidebar:
         with st.spinner("Sincronizando Google Sheets..."):
@@ -771,6 +826,7 @@ elif st.session_state.accion_actual == "asistencia":
                                 idx = int(key.split("_")[0])
                                 df_asistencia.at[idx, fecha_str] = "Presente" if presente else "Ausente"
                                 cambios_guardados += 1
+                                registrar_cambio("Asistencia", df_asistencia.at[idx, "Apellido y Nombre"], df_asistencia.at[idx, "Curso"], trimestre_asistencia, fecha_str, "anterior", "Presente" if presente else "Ausente")
 
                         columnas_asist = [c for c in df_asistencia.columns if any(m in c for m in ["Mar-", "Abr-", "May-"])]
                         for idx, row in df_asistencia.iterrows():
@@ -1042,6 +1098,7 @@ elif st.session_state.accion_actual == "evaluaciones":
                                         df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
                                         df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
                                         cambios_guardados += 1
+                                        registrar_cambio("Evaluación", df_evaluaciones.at[idx, "Apellido y Nombre"], df_evaluaciones.at[idx, "Curso"], trimestre_eval, f"Eval {j}", "anterior", cambios["calificacion"])
                             except (ValueError, KeyError):
                                 continue
 
@@ -1827,3 +1884,53 @@ elif st.session_state.accion_actual == "reporte":
     except Exception as e:
         st.error(f"Error: {e}")
         st.info("📊 Agrega datos simulados para probar")
+
+elif st.session_state.accion_actual == "historial":
+    st.header("📜 Historial de Cambios")
+    st.markdown("---")
+    st.info("Este historial se guarda en Google Sheets automáticamente.")
+    
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        creds_info = {
+            "type": st.secrets["gcp_service_account"]["type"],
+            "project_id": st.secrets["gcp_service_account"]["project_id"],
+            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+            "private_key": st.secrets["gcp_service_account"]["private_key"],
+            "client_email": st.secrets["gcp_service_account"]["client_email"],
+            "client_id": st.secrets["gcp_service_account"]["client_id"],
+            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+        }
+        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        client = gspread.authorize(creds)
+        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+        ws = spreadsheet.worksheet("Historial de Cambios")
+        data = ws.get_all_records()
+        if data:
+            df_hist = pd.DataFrame(data)
+            # Filtros
+            col1, col2 = st.columns(2)
+            with col1:
+                filtro_tipo = st.selectbox("Filtrar por tipo:", ["Todos", "Asistencia", "Evaluación"], key="hist_tipo")
+            with col2:
+                filtro_alumno = st.text_input("Buscar alumno:", key="hist_alumno", placeholder="Nombre...")
+            
+            if filtro_tipo != "Todos":
+                df_hist = df_hist[df_hist["Tipo"] == filtro_tipo]
+            if filtro_alumno:
+                df_hist = df_hist[df_hist["Alumno"].str.contains(filtro_alumno, case=False, na=False)]
+            
+            # Mostrar últimos 50 cambios primero
+            df_hist_display = df_hist.tail(50).iloc[::-1]
+            st.dataframe(df_hist_display, use_container_width=True)
+            st.caption(f"Mostrando últimos {len(df_hist_display)} registros de {len(df_hist)} totales")
+        else:
+            st.info("📋 No hay cambios registrados aún")
+    except Exception as e:
+        st.error(f"Error cargando historial: {e}")
