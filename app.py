@@ -37,7 +37,11 @@ st.sidebar.markdown("---")
 # Guardar y Backup
 if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backup_principal"):
     st.sidebar.success("✅ Guardado local completado!")
-    st.sidebar.info("🔄 Backup en Google Sheets iniciado...")
+    # Generar backup detallado
+    if generar_backup_detalles():
+        st.sidebar.success("✅ Backup en Excel generado exitosamente!")
+    else:
+        st.sidebar.error("❌ Error generando backup")
 
 # Inicializar estado
 if 'accion_actual' not in st.session_state:
@@ -61,6 +65,83 @@ def crear_excel_si_no_existe():
                 cell.alignment = Alignment(horizontal="center")
         wb.save(archivo_excel)
     return archivo_excel
+
+def generar_backup_detalles():
+    """Generar backup detallado en Excel con todas las columnas solicitadas"""
+    try:
+        archivo_excel = "sistema_educativo.xlsx"
+        if not os.path.exists(archivo_excel):
+            return False
+        
+        # Crear nuevo Excel para backup
+        backup_filename = f"backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        wb_backup = openpyxl.Workbook()
+        wb_backup.remove(wb_backup.active)
+        
+        # Procesar cada trimestre
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+            ws_backup = wb_backup.create_sheet(title=nombre_trimestre)
+            
+            # Encabezados del backup
+            headers_backup = [
+                "Fecha y Hora Backup", "Alumno", "Curso", "Trimestre",
+                "Asistencia", "Evaluación", "Tipo Evaluación", "Calificación"
+            ]
+            
+            # Escribir encabezados
+            for col_num, header in enumerate(headers_backup, 1):
+                cell = ws_backup.cell(row=1, column=col_num, value=header)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center")
+            
+            # Leer datos del trimestre
+            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+            
+            if not df_trimestre.empty:
+                row_num = 2
+                for idx, row in df_trimestre.iterrows():
+                    if pd.notna(row["Apellido y Nombre"]):
+                        # Procesar asistencia
+                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
+                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                        porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
+                        
+                        # Escribir fila de asistencia
+                        ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                        ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
+                        ws_backup.cell(row=row_num, column=3, value=row["Curso"])
+                        ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
+                        ws_backup.cell(row=row_num, column=5, value=f"{presentes}/{totales} ({porcentaje_asistencia:.1f}%)")
+                        ws_backup.cell(row=row_num, column=6, value="")  # Evaluación vacía para fila de asistencia
+                        ws_backup.cell(row=row_num, column=7, value="")  # Tipo vacío para fila de asistencia
+                        ws_backup.cell(row=row_num, column=8, value="")  # Calificación vacía para fila de asistencia
+                        row_num += 1
+                        
+                        # Procesar evaluaciones
+                        for j in range(1, 7):  # 6 evaluaciones
+                            eval_col = f"Eval {j}"
+                            calif_col = f"Calif {j}"
+                            
+                            if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
+                                ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
+                                ws_backup.cell(row=row_num, column=3, value=row["Curso"])
+                                ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
+                                ws_backup.cell(row=row_num, column=5, value="")  # Asistencia vacía para fila de evaluación
+                                ws_backup.cell(row=row_num, column=6, value=row[eval_col])
+                                ws_backup.cell(row=row_num, column=7, value=row.get("Tipo Evaluación", ""))
+                                ws_backup.cell(row=row_num, column=8, value=row[calif_col])
+                                row_num += 1
+        
+        # Guardar backup
+        wb_backup.save(backup_filename)
+        return True
+    except Exception as e:
+        st.error(f"Error generando backup: {e}")
+        return False
 
 def agregar_datos_simulados_completos():
     archivo_excel = "sistema_educativo.xlsx"
@@ -269,10 +350,8 @@ def crear_grafico_asistencia(presentes, ausentes, nombre_alumno):
     }
     df_grafico = pd.DataFrame(data)
     
-    # Usar colores personalizados
-    color_map = {'Presentes': '#4CAF50', 'Ausentes': '#F44336'}
-    
-    st.bar_chart(df_grafico.set_index('Estado'), color=[color_map[estado] for estado in df_grafico['Estado']])
+    # Usar un solo color para Streamlit
+    st.bar_chart(df_grafico.set_index('Estado'))
     st.caption(f"📊 Distribución de Asistencia - {nombre_alumno}")
 
 def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
@@ -280,7 +359,7 @@ def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
     df_grafico = pd.DataFrame(evaluaciones_data)
     
     if not df_grafico.empty:
-        st.bar_chart(df_grafico.set_index('Evaluación')['Valor Numérico'], color='#FF6B6B')
+        st.bar_chart(df_grafico.set_index('Evaluación')['Valor Numérico'])
         st.caption(f"📈 Rendimiento en Evaluaciones - {nombre_alumno}")
 
 archivo_excel = crear_excel_si_no_existe()
@@ -1013,16 +1092,5 @@ elif st.session_state.accion_actual == "estadistica":
         st.error(f"Error: {e}")
         st.info("📊 Agrega datos simulados para probar")
 
-# Footer simplificado sin banner
+# Footer simplificado
 st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #2E7D32; padding: 20px; border-top: 2px solid #4CAF50; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);'>
-    <p style='color: white; font-size: 16px; margin: 5px 0;'>
-        <span style='color: #4CAF50;'>✅</span> Sistema optimizado para educación física<br>
-        <span style='color: #4CAF50;'>👥</span> 65 alumnas simuladas<br>
-        <span style='color: #4CAF50;'>📝</span> 6 evaluaciones por trimestre<br>
-        <span style='color: #4CAF50;'>📊</span> Estadísticas individuales detalladas
-    </p>
-    <small style='color: rgba(255,255,255,0.8);'>Plataforma educativa profesional</small>
-</div>
-""", unsafe_allow_html=True)
