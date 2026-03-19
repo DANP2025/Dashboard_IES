@@ -36,16 +36,21 @@ st.sidebar.markdown("---")
 
 # Guardar y Backup
 if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backup_principal"):
-    st.sidebar.success("✅ Guardado local completado!")
-    # Generar backup detallado
     try:
         if generar_backup_detalles():
-            st.sidebar.success("✅ Backup en Excel generado exitosamente!")
-            st.sidebar.info(f"📁 Archivo: backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+            st.sidebar.success("✅ Backup Excel generado!")
         else:
-            st.sidebar.error("❌ Error generando backup")
+            st.sidebar.error("❌ Error generando backup Excel")
     except Exception as e:
-        st.sidebar.error(f"❌ Error: {e}")
+        st.sidebar.error(f"❌ Error Excel: {e}")
+
+    with st.sidebar:
+        with st.spinner("Sincronizando Google Sheets..."):
+            ok, mensaje = sincronizar_google_sheets()
+            if ok:
+                st.sidebar.success(f"✅ Google Sheets: {mensaje}")
+            else:
+                st.sidebar.error(f"❌ Google Sheets: {mensaje}")
 
 # Inicializar estado
 if 'accion_actual' not in st.session_state:
@@ -60,7 +65,6 @@ def sincronizar_google_sheets():
         import gspread
         from google.oauth2.service_account import Credentials
 
-        # Leer credenciales desde secrets.toml
         creds_info = {
             "type": st.secrets["gcp_service_account"]["type"],
             "project_id": st.secrets["gcp_service_account"]["project_id"],
@@ -81,13 +85,12 @@ def sincronizar_google_sheets():
         creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
         client = gspread.authorize(creds)
 
-        # Leer sheet_id desde secrets
         SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
         spreadsheet = client.open_by_key(SPREADSHEET_ID)
 
         archivo_excel = "sistema_educativo.xlsx"
         if not os.path.exists(archivo_excel):
-            return False, "No existe el archivo Excel local. Primero agregá datos."
+            return False, "No existe el archivo Excel local. Primero agregá datos simulados."
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -109,7 +112,9 @@ def sincronizar_google_sheets():
             try:
                 ws = spreadsheet.worksheet(nombre_trimestre)
             except Exception:
-                ws = spreadsheet.add_worksheet(title=nombre_trimestre, rows=500, cols=25)
+                ws = spreadsheet.add_worksheet(
+                    title=nombre_trimestre, rows=500, cols=25
+                )
 
             try:
                 df = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
@@ -129,8 +134,14 @@ def sincronizar_google_sheets():
                     col for col in df.columns
                     if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-"])
                 ]
-                presentes = sum(1 for col in columnas_asistencia if pd.notna(row.get(col)) and row.get(col) == "Presente")
-                totales = sum(1 for col in columnas_asistencia if pd.notna(row.get(col)))
+                presentes = sum(
+                    1 for col in columnas_asistencia
+                    if pd.notna(row.get(col)) and row.get(col) == "Presente"
+                )
+                totales = sum(
+                    1 for col in columnas_asistencia
+                    if pd.notna(row.get(col))
+                )
                 ausentes = totales - presentes
                 porcentaje = round((presentes / totales * 100), 1) if totales > 0 else 0
                 nota_asistencia = calcular_nota_asistencia(presentes, totales)
@@ -157,7 +168,9 @@ def sincronizar_google_sheets():
             ws.update(rows_data, value_input_option="USER_ENTERED")
 
             ws.format("A1:U1", {
-                "backgroundColor": {"red": 0.212, "green": 0.380, "blue": 0.573},
+                "backgroundColor": {
+                    "red": 0.212, "green": 0.380, "blue": 0.573
+                },
                 "textFormat": {
                     "bold": True,
                     "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
