@@ -1871,17 +1871,37 @@ elif st.session_state.accion_actual == "reporte":
                     
                     if asistencia_data:
                         st.markdown("#### 📅 Calendario de Asistencia")
-                        
-                        # Organizar por mes
-                        meses = {"Mar": [], "Abr": [], "May": []}
+
+                        # Mapeo de prefijos de mes a número de mes y año
+                        mes_a_numero = {
+                            "Mar": (3, 2026), "Abr": (4, 2026), "May": (5, 2026),
+                            "Jun": (6, 2026), "Jul": (7, 2026), "Ago": (8, 2026),
+                            "Sep": (9, 2026), "Oct": (10, 2026), "Nov": (11, 2026),
+                            "Dic": (12, 2026)
+                        }
+
+                        # Organizar por mes excluyendo sábados y domingos
+                        meses = {k: [] for k in mes_a_numero.keys()}
                         for item in asistencia_data:
-                            fecha = item["Fecha"]
-                            for mes in meses:
-                                if fecha.startswith(mes):
-                                    dia = int(fecha.split("-")[1])
-                                    meses[mes].append((dia, item["Estado"]))
-                        
-                        nombres_meses = {"Mar": "Marzo", "Abr": "Abril", "May": "Mayo"}
+                            fecha_col = item["Fecha"]
+                            for mes_prefix, (mes_num, anio) in mes_a_numero.items():
+                                if fecha_col.startswith(mes_prefix):
+                                    dia = int(fecha_col.split("-")[1])
+                                    try:
+                                        from datetime import date as dt_date
+                                        fecha_obj = dt_date(anio, mes_num, dia)
+                                        # 5=sábado, 6=domingo
+                                        if fecha_obj.weekday() < 5:
+                                            meses[mes_prefix].append((dia, item["Estado"]))
+                                    except ValueError:
+                                        pass  # día inválido para ese mes
+
+                        nombres_meses = {
+                            "Mar": "Marzo", "Abr": "Abril", "May": "Mayo",
+                            "Jun": "Junio", "Jul": "Julio", "Ago": "Agosto",
+                            "Sep": "Septiembre", "Oct": "Octubre",
+                            "Nov": "Noviembre", "Dic": "Diciembre"
+                        }
                         
                         for mes_key, dias in meses.items():
                             if dias:
