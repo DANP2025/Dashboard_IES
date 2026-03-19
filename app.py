@@ -188,15 +188,11 @@ def agregar_datos_simulados_completos():
                     for i, nombre in enumerate(nombres_curso):
                         asistencia_data = {}
                         for dia in range(1, 32):
-                            if dia <= 31:
-                                fecha_key = f"Mar-{dia:02d}"
-                                asistencia_data[fecha_key] = "Presente" if random.random() > 0.2 else "Ausente"
-                            elif dia <= 61:
-                                fecha_key = f"Abr-{(dia-31):02d}"
-                                asistencia_data[fecha_key] = "Presente" if random.random() > 0.2 else "Ausente"
-                            elif dia <= 92:
-                                fecha_key = f"May-{(dia-61):02d}"
-                                asistencia_data[fecha_key] = "Presente" if random.random() > 0.2 else "Ausente"
+                            asistencia_data[f"Mar-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 31):
+                            asistencia_data[f"Abr-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
+                        for dia in range(1, 32):
+                            asistencia_data[f"May-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
                         
                         presentes = sum(1 for v in asistencia_data.values() if v == "Presente")
                         totales = len(asistencia_data)
@@ -272,12 +268,11 @@ def agregar_nuevo_alumno(nombre, curso):
                 }
                 
                 for dia in range(1, 32):
-                    if dia <= 31:
-                        nuevo_alumno[f"Mar-{dia:02d}"] = "Ausente"
-                    elif dia <= 61:
-                        nuevo_alumno[f"Abr-{(dia-31):02d}"] = "Ausente"
-                    elif dia <= 92:
-                        nuevo_alumno[f"May-{(dia-61):02d}"] = "Ausente"
+                    nuevo_alumno[f"Mar-{dia:02d}"] = "Ausente"
+                for dia in range(1, 31):
+                    nuevo_alumno[f"Abr-{dia:02d}"] = "Ausente"
+                for dia in range(1, 32):
+                    nuevo_alumno[f"May-{dia:02d}"] = "Ausente"
                 
                 for j in range(1, 7):
                     nuevo_alumno[f"Eval {j}"] = f"Evaluación {j}"
