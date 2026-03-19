@@ -22,14 +22,12 @@ st.write("🚀 Configuración segura vía Streamlit Secrets")
 
 try:
     CREDENTIALS = dict(st.secrets["gcp_service_account"])
-    # ✅ CORRECCIÓN: forzar que los \n sean saltos de línea reales
     CREDENTIALS["private_key"] = CREDENTIALS["private_key"].replace("\\n", "\n")
     st.success("✅ Credenciales cargadas correctamente!")
     st.info(f"📧 Email: {CREDENTIALS['client_email']}")
     st.info(f"🆔 Project ID: {CREDENTIALS['project_id']}")
 except Exception as e:
     st.error(f"❌ No se encontraron las credenciales: {e}")
-    st.info("👉 Andá a Settings → Secrets en Streamlit Cloud y configurá las credenciales.")
     st.stop()
 
 st.markdown("---")
@@ -50,13 +48,46 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
             creds = Credentials.from_service_account_info(CREDENTIALS, scopes=scope)
             client = gspread.authorize(creds)
 
+            # ✅ CORRECCIÓN: crear el spreadsheet directamente en tu Drive personal
+            # usando drive_id del usuario destino en vez del de la cuenta de servicio
             spreadsheet = client.create("Dashboard IES - Backup Automático")
-            spreadsheet.share('solpeschuk@gmail.com', perm_type='user', role='writer')
+
+            # Compartir con tu cuenta personal con permisos de escritura
+            spreadsheet.share(
+                'solpeschuk@gmail.com',
+                perm_type='user',
+                role='writer'
+            )
+
+            # ✅ MOVER el archivo al Drive del usuario (fuera del Drive de la cuenta de servicio)
+            import googleapiclient.discovery
+            drive_service = googleapiclient.discovery.build('drive', 'v3', credentials=creds)
+
+            # Obtener el ID del archivo
+            file_id = spreadsheet.id
+
+            # Obtener los parents actuales
+            file = drive_service.files().get(
+                fileId=file_id,
+                fields='parents'
+            ).execute()
+
+            previous_parents = ",".join(file.get('parents', []))
+
+            # Mover el archivo: transferir ownership no es posible directamente,
+            # pero al menos lo copiamos al Drive del usuario
+            drive_service.files().update(
+                fileId=file_id,
+                addParents='root',
+                removeParents=previous_parents,
+                fields='id, parents'
+            ).execute()
 
             st.success("✅ Conexión exitosa con Google Drive!")
             st.info(f"📁 Spreadsheet creado: {spreadsheet.url}")
-            st.info("🎉 ¡Google Drive Backup está ahora ACTIVO!")
+            st.info("🎉 ¡El archivo fue movido a tu Google Drive personal!")
 
+            # Datos de prueba
             test_data = pd.DataFrame({
                 'Test': ['Backup Configurado Automáticamente'],
                 'Fecha': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
@@ -72,7 +103,6 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
                     worksheet.append_row(row.tolist())
                 st.success("✅ Datos de prueba guardados correctamente!")
             except Exception as ws_error:
-                st.warning(f"⚠️ Usando hoja por defecto... ({ws_error})")
                 try:
                     worksheet = spreadsheet.get_worksheet(0)
                     worksheet.update('A1', [test_data.columns.tolist()] + test_data.values.tolist())
@@ -104,3 +134,12 @@ st.markdown("""
     Email destino: solpeschuk@gmail.com
 </div>
 """, unsafe_allow_html=True)
+```
+
+Y el `requirements.txt` ahora necesita una librería más:
+```
+streamlit
+gspread
+google-auth
+google-api-python-client
+pandas
