@@ -28,7 +28,7 @@ def crear_excel_si_no_existe():
                 cell = ws.cell(row=1, column=col_num, value=header)
                 cell.font = Font(bold=True)
                 cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.alignment = Alignment(horizontal="center")
         wb.save(archivo_excel)
     return archivo_excel
 
@@ -36,24 +36,19 @@ def calcular_nota_asistencia(presentes, totales):
     if totales == 0:
         return 0
     porcentaje = (presentes / totales) * 100
-    if porcentaje >= 80:
+    if porcentaje >= 90:
         return 10
-    elif porcentaje >= 51:
+    elif porcentaje >= 80:
         return 8
     else:
         return 5
 
 def calificacion_a_numero(calif):
-    calif = str(calif).upper().strip()
-    if calif == "M": return 4
-    elif calif == "R-": return 6
-    elif calif == "R+": return 7
-    elif calif == "B": return 8
-    elif calif == "MB": return 9
-    elif calif == "EX": return 10
-    else:
-        try: return float(calif)
-        except: return 0
+    try:
+        calificaciones = {"M": 2, "R-": 4, "R+": 5, "B": 6, "MB": 8, "EX": 10}
+        return calificaciones.get(calif, 0)
+    except:
+        return 0
 
 def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
     """Función para guardar datos en Excel con manejo de errores"""
@@ -65,29 +60,121 @@ def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
         st.error(f"Error guardando en Excel: {e}")
         return False
 
-def restaurar_desde_sheets_si_vacio():
-    """Si el Excel local está vacío, restaura desde Google Sheets"""
+def generar_backup_detalles():
+    """Generar backup detallado en Excel con todas las columnas solicitadas"""
     try:
-        if not GOOGLE_SHEETS_DISPONIBLE:
+        archivo_excel = "sistema_educativo.xlsx"
+        if not os.path.exists(archivo_excel):
             return False
-        wb_check = openpyxl.load_workbook(archivo_excel)
-        ws_check = wb_check["1 Trimestre"]
-        tiene_datos = ws_check.max_row > 1
-        wb_check.close()
-        if tiene_datos:
-            return False  # Ya tiene datos, no hace falta restaurar
-
-        # Restaurar desde Sheets
-        restaurado = False
+        
+        backup_filename = f"backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        wb_backup = openpyxl.Workbook()
+        wb_backup.remove(wb_backup.active)
+        
         for trimestre_num in range(1, 4):
             nombre_trimestre = f"{trimestre_num} Trimestre"
-            df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
-            if df_sheets is not None and not df_sheets.empty:
-                guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel)
-                restaurado = True
-        return restaurado
-    except Exception:
+            ws_backup = wb_backup.create_sheet(title=nombre_trimestre)
+            
+            headers_backup = [
+                "Fecha y Hora Backup", "Alumno", "Curso", "Trimestre",
+                "Asistencia", "Evaluación", "Tipo Evaluación", "Calificación"
+            ]
+            
+            for col_num, header in enumerate(headers_backup, 1):
+                cell = ws_backup.cell(row=1, column=col_num, value=header)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center")
+            
+            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+            
+            if not df_trimestre.empty:
+                row_num = 2
+                for idx, row in df_trimestre.iterrows():
+                    if pd.notna(row["Apellido y Nombre"]):
+                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
+                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                        porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
+                        
+                        ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                        ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
+                        ws_backup.cell(row=row_num, column=3, value=row["Curso"])
+                        ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
+                        ws_backup.cell(row=row_num, column=5, value=f"{presentes}/{totales} ({porcentaje_asistencia:.1f}%)")
+                        ws_backup.cell(row=row_num, column=6, value="")
+                        ws_backup.cell(row=row_num, column=7, value="")
+                        ws_backup.cell(row=row_num, column=8, value="")
+                        row_num += 1
+                        
+                        for j in range(1, 7):
+                            eval_col = f"Eval {j}"
+                            calif_col = f"Calif {j}"
+                            
+                            if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
+                                ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
+                                ws_backup.cell(row=row_num, column=3, value=row["Curso"])
+                                ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
+                                ws_backup.cell(row=row_num, column=5, value="")
+                                ws_backup.cell(row=row_num, column=6, value=row[eval_col])
+                                ws_backup.cell(row=row_num, column=7, value=row.get("Tipo Evaluación", ""))
+                                ws_backup.cell(row=row_num, column=8, value=row[calif_col])
+                                row_num += 1
+        
+        wb_backup.save(backup_filename)
+        return True
+    except Exception as e:
+        st.error(f"Error generando backup: {e}")
         return False
+
+def cargar_datos_desde_sheets(nombre_trimestre):
+    """Carga datos desde Google Sheets si no existe el Excel local"""
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return None
+
+        creds_info = {
+            "type": st.secrets["gcp_service_account"]["type"],
+            "project_id": st.secrets["gcp_service_account"]["project_id"],
+            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+            "private_key": st.secrets["gcp_service_account"]["private_key"],
+            "client_email": st.secrets["gcp_service_account"]["client_email"],
+            "client_id": st.secrets["gcp_service_account"]["client_id"],
+            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+        }
+
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        client = gspread.authorize(creds)
+
+        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+
+        try:
+            ws = spreadsheet.worksheet(nombre_trimestre)
+            data = ws.get_all_values()
+            if len(data) <= 1:
+                return None
+            
+            headers = data[0]
+            rows = data[1:]
+            
+            df = pd.DataFrame(rows, columns=headers)
+            return df
+        except Exception:
+            return None
+    except Exception:
+        return None
 
 def sincronizar_google_sheets():
     """Sincroniza todos los datos con Google Sheets de forma legible"""
@@ -210,7 +297,6 @@ def sincronizar_google_sheets():
             ws.clear()
             ws.update(rows_data, value_input_option="USER_ENTERED")
 
-            # Formato encabezado
             ws.format("A1:U1", {
                 "backgroundColor": {"red": 0.118, "green": 0.227, "blue": 0.373},
                 "textFormat": {
@@ -221,7 +307,6 @@ def sincronizar_google_sheets():
                 "horizontalAlignment": "CENTER"
             })
 
-            # Formato filas de datos
             if len(rows_data) > 1:
                 rango_datos = f"A2:U{len(rows_data)}"
                 ws.format(rango_datos, {
@@ -234,71 +319,196 @@ def sincronizar_google_sheets():
     except Exception as e:
         return False, str(e)
 
-def cargar_datos_desde_sheets(nombre_trimestre):
-    """Carga datos desde Google Sheets si no existe el Excel local"""
+def restaurar_desde_sheets_si_vacio():
+    """Si el Excel local está vacío, restaura desde Google Sheets"""
     try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-
         if not GOOGLE_SHEETS_DISPONIBLE:
-            return None
+            return False
+        wb_check = openpyxl.load_workbook(archivo_excel)
+        ws_check = wb_check["1 Trimestre"]
+        tiene_datos = ws_check.max_row > 1
+        wb_check.close()
+        if tiene_datos:
+            return False
 
-        creds_info = {
-            "type": st.secrets["gcp_service_account"]["type"],
-            "project_id": st.secrets["gcp_service_account"]["project_id"],
-            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
-            "private_key": st.secrets["gcp_service_account"]["private_key"],
-            "client_email": st.secrets["gcp_service_account"]["client_email"],
-            "client_id": st.secrets["gcp_service_account"]["client_id"],
-            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
-            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
-        }
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
-        client = gspread.authorize(creds)
-
-        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
-        spreadsheet = client.open_by_key(SPREADSHEET_ID)
-
-        try:
-            ws = spreadsheet.worksheet(nombre_trimestre)
-            datos = ws.get_all_records()
-            if datos:
-                return pd.DataFrame(datos)
-        except Exception:
-            return None
-
-        return None
+        restaurado = False
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+            df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel)
+                restaurado = True
+        return restaurado
     except Exception:
+        return False
+
+def agregar_datos_simulados_completos():
+    archivo_excel = "sistema_educativo.xlsx"
+    if os.path.exists(archivo_excel):
+        try:
+            nombres_femeninos = [
+                "García López, Sofía María", "Rodríguez Martínez, Ana Isabel", "Fernández García, Laura Patricia",
+                "Sánchez Hernández, María José", "López Torres, Carmen Rosa", "Pérez Díaz, Beatriz Elena",
+                "Gómez Ruiz, Patricia Alejandra", "Martínez Castro, María Fernanda", "Romero Vargas, Ana Sofía",
+                "Alvarez Moreno, Isabel Cristina"
+            ]
+            
+            nombres_adicionales_ef1a = [
+                "Hernández González, Luciana Beatriz", "Mendoza Silva, Valentina Sofía", "Castro Ramos, Isabella Gabriela",
+                "Vargas Morales, Emilia Alejandra", "Ortiz Ruiz, Camila Victoria"
+            ]
+            
+            cursos = ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
+            
+            for trimestre_num in range(1, 4):
+                nombre_trimestre = f"{trimestre_num} Trimestre"
+                
+                df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+                
+                for curso in cursos:
+                    alumnos_curso = [n for n in nombres_femeninos if curso in n] + [n for n in nombres_adicionales_ef1a if curso in n]
+                    if curso == "EF 1A":
+                        alumnos_curso = alumnos_curso[:5]
+                    elif curso == "EF 2A":
+                        alumnos_curso = alumnos_curso[:5]
+                    
+                    for alumno in alumnos_curso:
+                        if alumno not in df_trimestre["Apellido y Nombre"].values:
+                            nueva_fila = {
+                                "Apellido y Nombre": alumno,
+                                "Curso": curso,
+                                "Tipo Evaluación": "Diagnóstico"
+                            }
+                            
+                            for mes in range(1, 32):
+                                fecha_col = f"Mar-{mes:02d}"
+                                if fecha_col not in df_trimestre.columns:
+                                    df_trimestre[fecha_col] = "Ausente"
+                                nueva_fila[fecha_col] = "Ausente" if random.random() > 0.15 else "Presente"
+                            
+                            for mes in range(1, 31):
+                                fecha_col = f"Abr-{mes:02d}"
+                                if fecha_col not in df_trimestre.columns:
+                                    df_trimestre[fecha_col] = "Ausente"
+                                nueva_fila[fecha_col] = "Ausente" if random.random() > 0.15 else "Presente"
+                            
+                            for mes in range(1, 32):
+                                fecha_col = f"May-{mes:02d}"
+                                if fecha_col not in df_trimestre.columns:
+                                    df_trimestre[fecha_col] = "Ausente"
+                                nueva_fila[fecha_col] = "Ausente" if random.random() > 0.15 else "Presente"
+                            
+                            evaluaciones = [
+                                "Test de Velocidad", "Test de Resistencia", "Test de Flexibilidad",
+                                "Test de Fuerza", "Test de Coordinación", "Test de Agilidad"
+                            ]
+                            calificaciones = ["B", "MB", "EX", "R+", "R-", "M"]
+                            
+                            for i in range(1, 7):
+                                nueva_fila[f"Eval {i}"] = random.choice(evaluaciones)
+                                nueva_fila[f"Calif {i}"] = random.choice(calificaciones)
+                            
+                            df_trimestre = pd.concat([df_trimestre, pd.DataFrame([nueva_fila])], ignore_index=True)
+                
+                guardar_datos_excel(df_trimestre, nombre_trimestre, archivo_excel)
+            return True
+        except Exception as e:
+            st.error(f"Error generando datos simulados: {e}")
+            return False
+    return False
+
+def agregar_nuevo_alumno(nombre, curso):
+    archivo_excel = "sistema_educativo.xlsx"
+    try:
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+            
+            nueva_fila = {
+                "Apellido y Nombre": nombre,
+                "Curso": curso,
+                "Tipo Evaluación": "Diagnóstico"
+            }
+            
+            columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+            for col in columnas_asistencia:
+                nueva_fila[col] = "Ausente"
+            
+            for i in range(1, 7):
+                nueva_fila[f"Eval {i}"] = ""
+                nueva_fila[f"Calif {i}"] = ""
+            
+            df_trimestre = pd.concat([df_trimestre, pd.DataFrame([nueva_fila])], ignore_index=True)
+            guardar_datos_excel(df_trimestre, nombre_trimestre, archivo_excel)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error agregando alumno: {e}")
+        return False
+
+def obtener_alumnos_disponibles():
+    archivo_excel = "sistema_educativo.xlsx"
+    try:
+        df_1t = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+        alumnos = df_1t["Apellido y Nombre"].dropna().tolist()
+        return ["Todos"] + sorted(alumnos)
+    except Exception:
+        return ["Todos"]
+
+def crear_grafico_asistencia(presentes, ausentes, nombre_alumno):
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 4))
+    labels = ['Presentes', 'Ausentes']
+    sizes = [presentes, ausentes]
+    colors = ['#2ecc71', '#e74c3c']
+    explode = (0.1, 0)
+    
+    ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')
+    plt.title(f'Asistencia - {nombre_alumno}', fontsize=14, fontweight='bold')
+    
+    return fig
+
+def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
+    import matplotlib.pyplot as plt
+    if not evaluaciones_data:
         return None
+    
+    df_grafico = pd.DataFrame(evaluaciones_data)
+    if not df_grafico.empty:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(df_grafico['Evaluación'], df_grafico['Valor Numérico'], color='#3498db')
+        ax.set_xlabel('Evaluaciones', fontsize=12)
+        ax.set_ylabel('Calificación', fontsize=12)
+        ax.set_title(f'Rendimiento en Evaluaciones - {nombre_alumno}', fontsize=14, fontweight='bold')
+        ax.set_ylim(0, 10.5)
+        plt.xticks(rotation=45, ha='right')
+        plt.grid(axis='y', alpha=0.3)
+        return fig
+    return None
 
-# Sidebar con ACCIONES
-st.sidebar.header("🎯 ACCIONES")
+# Inicializar estado
+if 'accion_actual' not in st.session_state:
+    st.session_state.accion_actual = "dashboard"
+if 'nuevas_evaluaciones' not in st.session_state:
+    st.session_state.nuevas_evaluaciones = []
 
-# Agregar Alumno
-if st.sidebar.button("👤 Agregar Alumno", type="primary", key="btn_agregar_alumno"):
-    st.session_state.accion_actual = "agregar_alumno"
+# Sidebar con botones de navegación
+st.sidebar.markdown("# 📚 Sistema Educativo")
+st.sidebar.markdown("---")
 
-# Asistencia
+if st.sidebar.button("📊 Dashboard", type="primary", key="btn_dashboard"):
+    st.session_state.accion_actual = "dashboard"
 if st.sidebar.button("📋 Asistencia", type="primary", key="btn_asistencia"):
     st.session_state.accion_actual = "asistencia"
-
-# Evaluaciones
 if st.sidebar.button("📝 Evaluaciones", type="primary", key="btn_evaluaciones"):
     st.session_state.accion_actual = "evaluaciones"
-
-# Reporte
-if st.sidebar.button("📊 Reporte", type="primary", key="btn_reporte"):
-    st.session_state.accion_actual = "reporte"
-
-# Estadística
+if st.sidebar.button("👤 Agregar Alumno", type="primary", key="btn_agregar_alumno"):
+    st.session_state.accion_actual = "agregar_alumno"
 if st.sidebar.button("📈 Estadística", type="primary", key="btn_estadistica"):
     st.session_state.accion_actual = "estadistica"
+if st.sidebar.button("📊 Reporte", type="primary", key="btn_reporte"):
+    st.session_state.accion_actual = "reporte"
 
 st.sidebar.markdown("---")
 
@@ -326,505 +536,6 @@ if 'accion_actual' not in st.session_state:
 if 'nuevas_evaluaciones' not in st.session_state:
     st.session_state.nuevas_evaluaciones = []
 
-# Funciones del sistema
-def crear_excel_si_no_existe():
-    archivo_excel = "sistema_educativo.xlsx"
-    if not os.path.exists(archivo_excel):
-        wb = openpyxl.Workbook()
-        wb.remove(wb.active)
-        for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
-            ws = wb.create_sheet(title=trimestre)
-            headers = ["Apellido y Nombre", "Curso"] + [f"Mar-{i:02d}" for i in range(1, 32)] + [f"Abr-{i:02d}" for i in range(1, 31)] + [f"May-{i:02d}" for i in range(1, 32)] + ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6", "Nota Final Evaluaciones", "Observaciones"]
-            for col_num, header in enumerate(headers, 1):
-                cell = ws.cell(row=1, column=col_num, value=header)
-                cell.font = Font(bold=True)
-                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-                cell.alignment = Alignment(horizontal="center")
-        wb.save(archivo_excel)
-    return archivo_excel
-
-def generar_backup_detalles():
-    """Generar backup detallado en Excel con todas las columnas solicitadas"""
-    try:
-        archivo_excel = "sistema_educativo.xlsx"
-        if not os.path.exists(archivo_excel):
-            return False
-        
-        # Crear nuevo Excel para backup
-        backup_filename = f"backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        wb_backup = openpyxl.Workbook()
-        wb_backup.remove(wb_backup.active)
-        
-        # Procesar cada trimestre
-        for trimestre_num in range(1, 4):
-            nombre_trimestre = f"{trimestre_num} Trimestre"
-            ws_backup = wb_backup.create_sheet(title=nombre_trimestre)
-            
-            # Encabezados del backup
-            headers_backup = [
-                "Fecha y Hora Backup", "Alumno", "Curso", "Trimestre",
-                "Asistencia", "Evaluación", "Tipo Evaluación", "Calificación"
-            ]
-            
-            # Escribir encabezados
-            for col_num, header in enumerate(headers_backup, 1):
-                cell = ws_backup.cell(row=1, column=col_num, value=header)
-                cell.font = Font(bold=True)
-                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-                cell.alignment = Alignment(horizontal="center")
-            
-            # Leer datos del trimestre
-            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
-            
-            if not df_trimestre.empty:
-                row_num = 2
-                for idx, row in df_trimestre.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        # Procesar asistencia
-                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                        porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
-                        
-                        # Escribir fila de asistencia
-                        ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                        ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
-                        ws_backup.cell(row=row_num, column=3, value=row["Curso"])
-                        ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
-                        ws_backup.cell(row=row_num, column=5, value=f"{presentes}/{totales} ({porcentaje_asistencia:.1f}%)")
-                        ws_backup.cell(row=row_num, column=6, value="")  # Evaluación vacía para fila de asistencia
-                        ws_backup.cell(row=row_num, column=7, value="")  # Tipo vacío para fila de asistencia
-                        ws_backup.cell(row=row_num, column=8, value="")  # Calificación vacía para fila de asistencia
-                        row_num += 1
-                        
-                        # Procesar evaluaciones
-                        for j in range(1, 7):  # 6 evaluaciones
-                            eval_col = f"Eval {j}"
-                            calif_col = f"Calif {j}"
-                            
-                            if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
-                                ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                                ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
-                                ws_backup.cell(row=row_num, column=3, value=row["Curso"])
-                                ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
-                                ws_backup.cell(row=row_num, column=5, value="")  # Asistencia vacía para fila de evaluación
-                                ws_backup.cell(row=row_num, column=6, value=row[eval_col])
-                                ws_backup.cell(row=row_num, column=7, value=row.get("Tipo Evaluación", ""))
-                                ws_backup.cell(row=row_num, column=8, value=row[calif_col])
-                                row_num += 1
-        
-        # Guardar backup
-        wb_backup.save(backup_filename)
-        return True
-    except Exception as e:
-        st.error(f"Error generando backup: {e}")
-        return False
-
-def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
-    """Función para guardar datos en Excel con manejo de errores"""
-    try:
-        with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error guardando en Excel: {e}")
-        return False
-
-def generar_backup_detalles():
-    """Generar backup detallado en Excel con todas las columnas solicitadas"""
-    try:
-        archivo_excel = "sistema_educativo.xlsx"
-        if not os.path.exists(archivo_excel):
-            return False
-        
-        # Crear nuevo Excel para backup
-        backup_filename = f"backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        wb_backup = openpyxl.Workbook()
-        wb_backup.remove(wb_backup.active)
-        
-        # Procesar cada trimestre
-        for trimestre_num in range(1, 4):
-            nombre_trimestre = f"{trimestre_num} Trimestre"
-            ws_backup = wb_backup.create_sheet(title=nombre_trimestre)
-            
-            # Encabezados del backup
-            headers_backup = [
-                "Fecha y Hora Backup", "Alumno", "Curso", "Trimestre",
-                "Asistencia", "Evaluación", "Tipo Evaluación", "Calificación"
-            ]
-            
-            # Escribir encabezados
-            for col_num, header in enumerate(headers_backup, 1):
-                cell = ws_backup.cell(row=1, column=col_num, value=header)
-                cell.font = Font(bold=True)
-                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-                cell.alignment = Alignment(horizontal="center")
-            
-            # Leer datos del trimestre
-            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
-            
-            if not df_trimestre.empty:
-                row_num = 2
-                for idx, row in df_trimestre.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        # Procesar asistencia
-                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                        porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
-                        
-                        # Escribir fila de asistencia
-                        ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                        ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
-                        ws_backup.cell(row=row_num, column=3, value=row["Curso"])
-                        ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
-                        ws_backup.cell(row=row_num, column=5, value=f"{presentes}/{totales} ({porcentaje_asistencia:.1f}%)")
-                        ws_backup.cell(row=row_num, column=6, value="")  # Evaluación vacía para fila de asistencia
-                        ws_backup.cell(row=row_num, column=7, value="")  # Tipo vacío para fila de asistencia
-                        ws_backup.cell(row=row_num, column=8, value="")  # Calificación vacía para fila de asistencia
-                        row_num += 1
-                        
-                        # Procesar evaluaciones
-                        for j in range(1, 7):  # 6 evaluaciones
-                            eval_col = f"Eval {j}"
-                            calif_col = f"Calif {j}"
-                            
-                            if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
-                                ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                                ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
-                                ws_backup.cell(row=row_num, column=3, value=row["Curso"])
-                                ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
-                                ws_backup.cell(row=row_num, column=5, value="")  # Asistencia vacía para fila de evaluación
-                                ws_backup.cell(row=row_num, column=6, value=row[eval_col])
-                                ws_backup.cell(row=row_num, column=7, value=row.get("Tipo Evaluación", ""))
-                                ws_backup.cell(row=row_num, column=8, value=row[calif_col])
-                                row_num += 1
-        
-        # Guardar backup
-        wb_backup.save(backup_filename)
-        return True
-    except Exception as e:
-        st.error(f"Error generando backup: {e}")
-        return False
-
-def sincronizar_google_sheets():
-    """Sincroniza todos los datos con Google Sheets de forma legible"""
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-
-        if not GOOGLE_SHEETS_DISPONIBLE:
-            return False, "Secrets de Google no configurados"
-
-        creds_info = {
-            "type": st.secrets["gcp_service_account"]["type"],
-            "project_id": st.secrets["gcp_service_account"]["project_id"],
-            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
-            "private_key": st.secrets["gcp_service_account"]["private_key"],
-            "client_email": st.secrets["gcp_service_account"]["client_email"],
-            "client_id": st.secrets["gcp_service_account"]["client_id"],
-            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
-            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
-        }
-
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
-        client = gspread.authorize(creds)
-
-        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
-        spreadsheet = client.open_by_key(SPREADSHEET_ID)
-
-        archivo_excel = "sistema_educativo.xlsx"
-        if not os.path.exists(archivo_excel):
-            return False, "No existe el archivo Excel local. Primero agregá datos simulados."
-
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-        headers = [
-            "Última Actualización",
-            "Apellido y Nombre",
-            "Curso",
-            "Trimestre",
-            "Días Presentes",
-            "Días Ausentes",
-            "% Asistencia",
-            "Nota Asistencia",
-            "Eval 1 — Nombre",
-            "Eval 1 — Calif",
-            "Eval 2 — Nombre",
-            "Eval 2 — Calif",
-            "Eval 3 — Nombre",
-            "Eval 3 — Calif",
-            "Eval 4 — Nombre",
-            "Eval 4 — Calif",
-            "Eval 5 — Nombre",
-            "Eval 5 — Calif",
-            "Eval 6 — Nombre",
-            "Eval 6 — Calif",
-            "Promedio Final"
-        ]
-
-        for trimestre_num in range(1, 4):
-            nombre_trimestre = f"{trimestre_num} Trimestre"
-
-            try:
-                ws = spreadsheet.worksheet(nombre_trimestre)
-            except Exception:
-                ws = spreadsheet.add_worksheet(title=nombre_trimestre, rows=500, cols=25)
-
-            try:
-                df = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
-            except Exception:
-                continue
-
-            if df.empty:
-                continue
-
-            rows_data = [headers]
-
-            for _, row in df.iterrows():
-                if pd.isna(row.get("Apellido y Nombre")):
-                    continue
-
-                columnas_asistencia = [
-                    col for col in df.columns
-                    if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-"])
-                ]
-                presentes = sum(
-                    1 for col in columnas_asistencia
-                    if pd.notna(row.get(col)) and row.get(col) == "Presente"
-                )
-                totales = sum(
-                    1 for col in columnas_asistencia
-                    if pd.notna(row.get(col))
-                )
-                ausentes = totales - presentes
-                porcentaje = round((presentes / totales * 100), 1) if totales > 0 else 0
-                nota_asistencia = calcular_nota_asistencia(presentes, totales)
-
-                fila = [
-                    timestamp,
-                    str(row.get("Apellido y Nombre", "")),
-                    str(row.get("Curso", "")),
-                    nombre_trimestre,
-                    presentes,
-                    ausentes,
-                    f"{porcentaje}%",
-                    nota_asistencia,
-                ]
-
-                for j in range(1, 7):
-                    fila.append(str(row.get(f"Eval {j}", "")))
-                    fila.append(str(row.get(f"Calif {j}", "")))
-
-                fila.append(str(row.get("Nota Final Evaluaciones", "")))
-                rows_data.append(fila)
-
-            ws.clear()
-            ws.update(rows_data, value_input_option="USER_ENTERED")
-
-            # Formato encabezado
-            ws.format("A1:U1", {
-                "backgroundColor": {"red": 0.118, "green": 0.227, "blue": 0.373},
-                "textFormat": {
-                    "bold": True,
-                    "fontSize": 10,
-                    "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
-                },
-                "horizontalAlignment": "CENTER"
-            })
-
-            # Formato filas de datos
-            if len(rows_data) > 1:
-                rango_datos = f"A2:U{len(rows_data)}"
-                ws.format(rango_datos, {
-                    "textFormat": {"fontSize": 10},
-                    "horizontalAlignment": "LEFT"
-                })
-
-        return True, f"Sincronizado el {timestamp}"
-
-    except Exception as e:
-        return False, str(e)
-    archivo_excel = "sistema_educativo.xlsx"
-    if os.path.exists(archivo_excel):
-        try:
-            nombres_femeninos = [
-                "García López, Sofía María", "Rodríguez Martínez, Ana Isabel", "Fernández García, Laura Patricia",
-                "Sánchez Hernández, María José", "López Torres, Carmen Rosa", "Pérez Díaz, Beatriz Elena",
-                "Gómez Ruiz, Patricia Alejandra", "Martínez Castro, María Fernanda", "Romero Vargas, Ana Sofía",
-                "Alvarez Moreno, Isabel Cristina"
-            ]
-            
-            nombres_adicionales_ef1a = [
-                "Hernández González, Luciana Beatriz", "Mendoza Silva, Valentina Sofía", "Castro Ramos, Isabella Gabriela",
-                "Vargas Morales, Emilia Alejandra", "Ortiz Ruiz, Camila Victoria"
-            ]
-            
-            cursos = ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
-            
-            for trimestre_num in range(1, 4):
-                nombre_trimestre = f"{trimestre_num} Trimestre"
-                datos_trimestre = []
-                
-                for curso in cursos:
-                    if curso == "EF 1A":
-                        nombres_curso = nombres_femeninos[:10] + nombres_adicionales_ef1a
-                    else:
-                        nombres_curso = nombres_femeninos[:10]
-                    
-                    for i, nombre in enumerate(nombres_curso):
-                        asistencia_data = {}
-                        for dia in range(1, 32):
-                            asistencia_data[f"Mar-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
-                        for dia in range(1, 31):
-                            asistencia_data[f"Abr-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
-                        for dia in range(1, 32):
-                            asistencia_data[f"May-{dia:02d}"] = "Presente" if random.random() > 0.2 else "Ausente"
-                        
-                        presentes = sum(1 for v in asistencia_data.values() if v == "Presente")
-                        totales = len(asistencia_data)
-                        porcentaje = (presentes / totales * 100) if totales > 0 else 0
-                        
-                        if porcentaje >= 80:
-                            nota_asistencia = 10
-                        elif porcentaje >= 51:
-                            nota_asistencia = 8
-                        else:
-                            nota_asistencia = 5
-                        
-                        alumno_data = {
-                            "Apellido y Nombre": nombre,
-                            "Curso": curso,
-                            "Nota Asistencia": nota_asistencia,
-                            "Tipo Evaluación": "Diagnóstico"
-                        }
-                        alumno_data.update(asistencia_data)
-                        
-                        for j in range(1, 7):
-                            eval_col = f"Eval {j}"
-                            calif_col = f"Calif {j}"
-                            alumno_data[eval_col] = f"Evaluación {j}"
-                            alumno_data[calif_col] = "B"
-                        
-                        calificaciones = []
-                        for i in range(1, 7):
-                            calif_col_temp = f"Calif {i}"
-                            if calif_col_temp in alumno_data:
-                                calificaciones.append(calificacion_a_numero(alumno_data[calif_col_temp]))
-                        
-                        promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                        alumno_data["Nota Final Evaluaciones"] = round(promedio_final, 1)
-                        
-                        datos_trimestre.append(alumno_data)
-                        datos_trimestre.append(datos_alumna)
-                
-                df_trimestre = pd.DataFrame(datos_trimestre)
-                if guardar_datos_excel(df_trimestre, nombre_trimestre, archivo_excel):
-                    continue
-                else:
-                    return False
-            
-            return True
-        except Exception as e:
-            st.error(f"Error: {e}")
-            return False
-    return False
-
-def agregar_nuevo_alumno(nombre, curso):
-    archivo_excel = "sistema_educativo.xlsx"
-    if os.path.exists(archivo_excel):
-        try:
-            for trimestre_num in range(1, 4):
-                nombre_trimestre = f"{trimestre_num} Trimestre"
-                df_existente = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
-                
-                nuevo_alumno = {
-                    "Apellido y Nombre": nombre,
-                    "Curso": curso,
-                    "Nota Asistencia": 0,
-                    "Tipo Evaluación": "Diagnóstico",
-                    "Observaciones": "Nuevo alumno"
-                }
-                
-                for dia in range(1, 32):
-                    nuevo_alumno[f"Mar-{dia:02d}"] = "Ausente"
-                for dia in range(1, 31):
-                    nuevo_alumno[f"Abr-{dia:02d}"] = "Ausente"
-                for dia in range(1, 32):
-                    nuevo_alumno[f"May-{dia:02d}"] = "Ausente"
-                
-                for j in range(1, 7):
-                    nuevo_alumno[f"Eval {j}"] = f"Evaluación {j}"
-                    nuevo_alumno[f"Calif {j}"] = "B"
-                
-                nuevo_alumno["Nota Final Evaluaciones"] = 8.0
-                
-                df_actualizado = pd.concat([df_existente, pd.DataFrame([nuevo_alumno])], ignore_index=True)
-                
-                if guardar_datos_excel(df_actualizado, nombre_trimestre, archivo_excel):
-                    continue
-                else:
-                    return False
-            
-            return True
-        except Exception as e:
-            st.error(f"Error: {e}")
-            return False
-    return False
-
-def calcular_nota_asistencia(presentes, totales):
-    if totales == 0:
-        return 0
-    porcentaje = (presentes / totales) * 100
-    if porcentaje >= 80:
-        return 10
-    elif porcentaje >= 51:
-        return 8
-    else:
-        return 5
-
-def calificacion_a_numero(calif):
-    calif = str(calif).upper().strip()
-    if calif == "M": return 4
-    elif calif == "R-": return 6
-    elif calif == "R+": return 7
-    elif calif == "B": return 8
-    elif calif == "MB": return 9
-    elif calif == "EX": return 10
-    else:
-        try: return float(calif)
-        except: return 0
-
-def obtener_alumnos_disponibles():
-    archivo_excel = "sistema_educativo.xlsx"
-    if os.path.exists(archivo_excel):
-        try:
-            df = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
-            if not df.empty:
-                alumnos = df["Apellido y Nombre"].dropna().tolist()
-                return ["Todos"] + alumnos
-        except:
-            pass
-    return ["Todos"]
-
-def crear_grafico_asistencia(presentes, ausentes, nombre_alumno):
-    data = {'Estado': ['Presentes', 'Ausentes'], 'Cantidad': [presentes, ausentes]}
-    df_grafico = pd.DataFrame(data)
-    st.bar_chart(df_grafico.set_index('Estado'))
-    st.caption(f"📊 Distribución de Asistencia - {nombre_alumno}")
-
-def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
-    df_grafico = pd.DataFrame(evaluaciones_data)
-    if not df_grafico.empty:
-        st.bar_chart(df_grafico.set_index('Evaluación')['Valor Numérico'])
-        st.caption(f"📈 Rendimiento en Evaluaciones - {nombre_alumno}")
-
 archivo_excel = crear_excel_si_no_existe()
 
 # Restaurar desde Google Sheets si Streamlit reinició y perdió los datos
@@ -849,12 +560,12 @@ if st.session_state.accion_actual == "dashboard":
     with col4: st.metric("📈 Promedio General", "7.6", delta="0.2")
     
     st.markdown("---")
-    st.subheader("📂 Resumen por Cursos")
+    
     resumen_cursos = [
-        {"Curso": "EF 1A", "Alumnos": 15, "Asistencia": "85%", "Promedio": "8.2"},
-        {"Curso": "EF 2A", "Alumnos": 10, "Asistencia": "78%", "Promedio": "7.5"},
-        {"Curso": "EF 1B", "Alumnos": 10, "Asistencia": "90%", "Promedio": "8.8"},
-        {"Curso": "EF 2B", "Alumnos": 10, "Asistencia": "82%", "Promedio": "7.9"},
+        {"Curso": "EF 1A", "Alumnos": 10, "Asistencia": "85%", "Promedio": "7.8"},
+        {"Curso": "EF 2A", "Alumnos": 10, "Asistencia": "78%", "Promedio": "7.2"},
+        {"Curso": "EF 1B", "Alumnos": 10, "Asistencia": "82%", "Promedio": "7.5"},
+        {"Curso": "EF 2B", "Alumnos": 10, "Asistencia": "80%", "Promedio": "7.6"},
         {"Curso": "TD 2A", "Alumnos": 10, "Asistencia": "76%", "Promedio": "7.2"},
         {"Curso": "TD 2B", "Alumnos": 10, "Asistencia": "80%", "Promedio": "7.6"}
     ]
@@ -885,39 +596,6 @@ if st.session_state.accion_actual == "dashboard":
                     st.error(f"❌ Error: {e}")
     with col2:
         if st.button("🔄 Actualizar Datos", type="secondary"):
-            st.rerun()
-    with col3:
-        st.write("")
-    
-
-elif st.session_state.accion_actual == "agregar_alumno":
-    st.header("👤 Agregar Nuevo Alumno")
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        nuevo_nombre = st.text_input("📝 Nombre Completo del Alumno:", key="nuevo_nombre_alumno")
-    with col2:
-        nuevo_curso = st.selectbox("📂 Curso:", ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="nuevo_curso_alumno")
-    with col3:
-        st.write("")
-    
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("✅ Agregar Alumno", type="primary", key="btn_agregar_nuevo_alumno"):
-            if nuevo_nombre and nuevo_curso:
-                if agregar_nuevo_alumno(nuevo_nombre, nuevo_curso):
-                    st.success(f"✅ Alumno '{nuevo_nombre}' agregado exitosamente al curso {nuevo_curso}")
-                    st.info("📊 Agregado a los 3 trimestres")
-                    st.rerun()
-                else:
-                    st.error("❌ Error al agregar el alumno")
-            else:
-                st.error("❌ Por favor completa todos los campos")
-    with col2:
-        if st.button("🔄 Limpiar Formulario", type="secondary", key="btn_limpiar_formulario"):
             st.rerun()
     with col3:
         st.write("")
@@ -977,22 +655,7 @@ elif st.session_state.accion_actual == "asistencia":
             
             for idx, row in df_asistencia.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
-                    st.markdown(f"### 📅 Asistencia del día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
-                    
-                    col_res1, col_res2, col_res3 = st.columns(3)
-                    presentes_hoy = sum(
-                        1 for idx, row in df_asistencia.iterrows()
-                        if pd.notna(row.get("Apellido y Nombre")) and
-                        row.get(fecha_seleccionada.strftime("%b-%d"), "Ausente") == "Presente"
-                    )
-                    total_hoy = sum(1 for idx, row in df_asistencia.iterrows() if pd.notna(row.get("Apellido y Nombre")))
-                    with col_res1:
-                        st.metric("✅ Presentes", presentes_hoy)
-                    with col_res2:
-                        st.metric("❌ Ausentes", total_hoy - presentes_hoy)
-                    with col_res3:
-                        st.metric("📊 Total", total_hoy)
-                    st.markdown("---")
+                    st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
                     col1, col2, col3 = st.columns([3, 1, 1])
                     
@@ -1061,29 +724,12 @@ elif st.session_state.accion_actual == "asistencia":
                             st.rerun()
                         except Exception as e:
                             st.error(f"❌ Error: {e}")
-            
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_asistencia"):
                     st.session_state.asistencia_cambios = {}
                     st.rerun()
-            
             with col3:
-                presentes_dia = 0
-                total_dia = 0
-                
-                for idx, row in df_asistencia.iterrows():
-                    if pd.notna(row["Apellido y Nombre"]):
-                        total_dia += 1
-                        estado = row[fecha_str] if pd.notna(row[fecha_str]) else "Ausente"
-                        if estado == "Presente":
-                            presentes_dia += 1
-                
-                if total_dia > 0:
-                    porcentaje_dia = (presentes_dia / total_dia) * 100
-                    st.metric(f"📊 {fecha_str}", f"{presentes_dia}/{total_dia}", f"{porcentaje_dia:.1f}%")
-            
-        else:
-            st.info("📋 No hay alumnas para mostrar en este curso")
+                st.write("")
     except Exception as e:
         st.error(f"Error: {e}")
         st.info("📊 Agrega datos simulados para probar")
@@ -1205,7 +851,7 @@ elif st.session_state.accion_actual == "evaluaciones":
                     st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
                     # Encabezado visual
-                    col_h1, col_h2, col_h3, col_h4 = st.columns([1, 3, 2, 1])
+                    col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 3, 2, 2, 1])
                     with col_h1:
                         st.caption("Nro.")
                     with col_h2:
@@ -1213,6 +859,8 @@ elif st.session_state.accion_actual == "evaluaciones":
                     with col_h3:
                         st.caption("Calificación")
                     with col_h4:
+                        st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
+                    with col_h5:
                         st.caption("Estado")
                     
                     for j in range(1, 7):
@@ -1256,46 +904,9 @@ elif st.session_state.accion_actual == "evaluaciones":
 
                             st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
                                 "nombre": nombre_eval_actual,
-                                "calificacion": calificacion
+                                "calificacion": calificacion,
+                                "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
                             }
-                    
-                    if st.session_state.nuevas_evaluaciones:
-                        for nueva_eval in st.session_state.nuevas_evaluaciones:
-                            # Layout claro para nuevas evaluaciones
-                            st.markdown("---")
-                            st.write(f"### 🆕 **Nueva Evaluación: {nueva_eval['nombre']}**")
-                            
-                            col1, col2, col3 = st.columns([2, 3, 2])
-                            
-                            with col1:
-                                st.write("**📋 Tipo de Evaluación**")
-                                st.write(f"**{nueva_eval['tipo']}**")
-                            
-                            with col2:
-                                st.write("**📝 Nombre de la Evaluación**")
-                                st.write(f"**{nueva_eval['nombre']}**")
-                                calif_nueva = st.selectbox(
-                                    "Calif:", 
-                                    ["M", "R-", "R+", "B", "MB", "EX"],
-                                    key=f"eval_nueva_{nueva_eval['numero']}_{idx}",
-                                    help="Seleccionar calificación"
-                                )
-                            
-                            with col3:
-                                st.write("**⭐ Calificación**")
-                                # Mostrar calificación con color
-                                if calif_nueva == "EX":
-                                    st.success("🌟 EXCELENTE")
-                                elif calif_nueva == "MB":
-                                    st.success("✅ MUY BUENO")
-                                elif calif_nueva == "B":
-                                    st.info("✅ BUENO")
-                                elif calif_nueva == "R+":
-                                    st.warning("⚠️ REGULAR+")
-                                elif calif_nueva == "R-":
-                                    st.error("❌ REGULAR-")
-                                else:
-                                    st.error("💔 INSUFICIENTE")
                     
                     st.markdown("---")
             
@@ -1348,221 +959,82 @@ elif st.session_state.accion_actual == "evaluaciones":
                             st.rerun()
                         except Exception as e:
                             st.error(f"❌ Error inesperado: {e}")
-            
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_evaluaciones"):
                     st.session_state.evaluaciones_cambios = {}
                     st.rerun()
-            
             with col3:
                 calificaciones_contadas = {"M": 0, "R-": 0, "R+": 0, "B": 0, "MB": 0, "EX": 0}
                 total_evaluaciones = 0
                 
-                for idx, row in df_evaluaciones.iterrows():
+                for _, row in df_evaluaciones.iterrows():
                     if pd.notna(row["Apellido y Nombre"]):
-                        for j in range(1, 7):
-                            calif_col = f"Calif {j}"
-                            calif = row.get(calif_col)
-                            if pd.notna(calif) and calif in calificaciones_contadas:
+                        for i in range(1, 7):
+                            calif = df_evaluaciones.at[row.name, f"Calif {i}"]
+                            if pd.notna(calif):
                                 calificaciones_contadas[calif] += 1
                                 total_evaluaciones += 1
                 
                 if total_evaluaciones > 0:
-                    st.metric("📊 Total Evaluaciones", f"{total_evaluaciones}")
-        else:
-            st.info("📋 No hay alumnas para mostrar en este curso")
+                    st.write("#### 📈 Distribución de Calificaciones")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write("📈 **Distribución calificaciones:**")
+                        for calif, cantidad in calificaciones_contadas.items():
+                            st.write(f"- {calif}: {cantidad}")
+                    with col2:
+                        st.write(f"📊 **Total evaluaciones:** {total_evaluaciones}")
+                    with col3:
+                        st.write(f"📈 **Promedio general:** {total_evaluaciones/6:.1f}")
     except Exception as e:
         st.error(f"Error: {e}")
         st.info("📊 Agrega datos simulados para probar")
 
-elif st.session_state.accion_actual == "reporte":
-    st.header("📊 Reporte Individual Completo")
+elif st.session_state.accion_actual == "agregar_alumno":
+    st.header("👤 Agregar Nuevo Alumno")
     st.markdown("---")
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        curso_reporte = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="reporte_curso")
+        nuevo_nombre = st.text_input("📝 Nombre Completo del Alumno:", key="nuevo_nombre_alumno")
     with col2:
-        trimestre_reporte = st.selectbox("📅 Seleccionar Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="reporte_trimestre")
+        nuevo_curso = st.selectbox("📂 Curso:", ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="nuevo_curso_alumno")
     with col3:
-        alumnos_disponibles = obtener_alumnos_disponibles()
-        alumno_reporte = st.selectbox("👤 Seleccionar Alumno:", alumnos_disponibles, key="reporte_alumno")
+        st.write("")
     
     st.markdown("---")
     
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("➕ Agregar Alumno", type="primary", key="btn_agregar_alumno_def"):
+            if nuevo_nombre and nuevo_curso:
+                if agregar_nuevo_alumno(nuevo_nombre, nuevo_curso):
+                    st.success(f"✅ '{nuevo_nombre}' agregado a {nuevo_curso}")
+                    st.rerun()
+                else:
+                    st.error("❌ Error agregando alumno")
+            else:
+                st.error("❌ Completá todos los campos")
+    with col2:
+        st.write("")
+    with col3:
+        st.write("")
+    
+    st.markdown("---")
+    st.write("📋 **Alumnos Actuales:**")
     try:
-        # Intentar leer desde Excel local
-        df_reporte = pd.read_excel(archivo_excel, sheet_name=trimestre_reporte)
-        # Si está vacío, intentar desde Sheets
-        if df_reporte.empty and GOOGLE_SHEETS_DISPONIBLE:
-            df_sheets = cargar_datos_desde_sheets(trimestre_reporte)
-            if df_sheets is not None and not df_sheets.empty:
-                guardar_datos_excel(df_sheets, trimestre_reporte, archivo_excel)
-                df_reporte = df_sheets
-    except Exception:
-        df_reporte = pd.DataFrame()
-        if GOOGLE_SHEETS_DISPONIBLE:
-            df_sheets = cargar_datos_desde_sheets(trimestre_reporte)
-            if df_sheets is not None and not df_sheets.empty:
-                df_reporte = df_sheets
-        
-        if curso_reporte != "Todos":
-            df_reporte = df_reporte[df_reporte["Curso"] == curso_reporte]
-        
-        if alumno_reporte != "Todos":
-            df_reporte = df_reporte[df_reporte["Apellido y Nombre"] == alumno_reporte]
-        
-        if not df_reporte.empty:
-            for idx, row in df_reporte.iterrows():
+        df_alumnos = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+        if not df_alumnos.empty:
+            for idx, row in df_alumnos.iterrows():
                 if pd.notna(row["Apellido y Nombre"]):
-                    st.write(f"# 📊 Reporte Individual: {row['Apellido y Nombre']}")
-                    st.write(f"**📂 Curso:** {row['Curso']}")
-                    st.write(f"**📅 Trimestre:** {trimestre_reporte}")
-                    st.markdown("---")
-                    
-                    st.write("## 📋 Asistencia")
-                    columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                    presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                    totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
-                    ausentes = totales - presentes
-                    porcentaje = (presentes / totales * 100) if totales > 0 else 0
-                    
-                    if porcentaje >= 80:
-                        nota_asistencia = "EX (10)"
-                        color_asistencia = "🌟"
-                    elif porcentaje >= 51:
-                        nota_asistencia = "R+ (8)"
-                        color_asistencia = "⚠️"
-                    else:
-                        nota_asistencia = "M (5)"
-                        color_asistencia = "💔"
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1: st.metric("📊 Días Presentes", presentes)
-                    with col2: st.metric("📊 Días Ausentes", ausentes)
-                    with col3: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
-                    with col4: st.metric("📊 Nota Asistencia", f"{color_asistencia} {nota_asistencia}")
-                    
-                    st.markdown("---")
-                    st.write("### 📈 Gráfico de Asistencia")
-                    crear_grafico_asistencia(presentes, ausentes, row["Apellido y Nombre"])
-                    
-                    st.markdown("---")
-                    st.write("## 📝 Evaluaciones")
-                    evaluaciones_data = []
-                    calificaciones = []
-                    
-                    for i in range(1, 7):
-                        eval_col = f"Eval {i}"
-                        calif_col = f"Calif {i}"
-                        if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
-                            evaluaciones_data.append({
-                                "Evaluación": row[eval_col],
-                                "Calificación": row[calif_col],
-                                "Valor Numérico": calificacion_a_numero(row[calif_col])
-                            })
-                            calificaciones.append(calificacion_a_numero(row[calif_col]))
-                    
-                    if evaluaciones_data:
-                        df_eval_display = pd.DataFrame(evaluaciones_data)
-                        st.dataframe(df_eval_display, use_container_width=True)
-                        
-                        promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("📊 Promedio Final Evaluaciones", f"{promedio_final:.1f}")
-                        with col2:
-                            if promedio_final >= 9:
-                                calif_final = "EX"
-                                color_final = "🌟"
-                            elif promedio_final >= 8:
-                                calif_final = "MB"
-                                color_final = "✅"
-                            elif promedio_final >= 7:
-                                calif_final = "B"
-                                color_final = "✅"
-                            elif promedio_final >= 6:
-                                calif_final = "R+"
-                                color_final = "⚠️"
-                            else:
-                                calif_final = "M"
-                                color_final = "💔"
-                            
-                            st.metric("📊 Calificación Final", f"{color_final} {calif_final}")
-                        
-                        st.markdown("---")
-                        st.write("### 📈 Gráfico de Evaluaciones")
-                        crear_grafico_evaluaciones(evaluaciones_data, row["Apellido y Nombre"])
-                    
-                    st.markdown("---")
-                    st.write("## 📈 Resumen General")
-                    nota_asistencia_num = calcular_nota_asistencia(presentes, totales)
-                    promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                    promedio_general = (nota_asistencia_num + promedio_eval) / 2 if calificaciones else nota_asistencia_num
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1: st.metric("📊 Nota Asistencia", f"{nota_asistencia_num:.1f}")
-                    with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_eval:.1f}")
-                    with col3: st.metric("📊 Promedio General", f"{promedio_general:.1f}")
-                    
-                    break
-        else:
-            st.info("📋 No hay datos para mostrar")
+                    st.write(f"👤 {row['Apellido y Nombre']} - 📂 {row['Curso']}")
     except Exception as e:
         st.error(f"Error: {e}")
-        st.info("📊 Agrega datos simulados para probar")
 
 elif st.session_state.accion_actual == "estadistica":
-    # CSS personalizado para estadística
-    st.markdown("""
-    <style>
-        .stat-card {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
-            padding: 20px;
-            border-radius: 12px;
-            margin: 8px 0;
-            color: white;
-        }
-        .stat-title {
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: #a8c8e8;
-            margin-bottom: 4px;
-        }
-        .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: white;
-        }
-        .stat-sub {
-            font-size: 12px;
-            color: #7fb3d3;
-            margin-top: 2px;
-        }
-        .seccion-titulo {
-            font-size: 16px;
-            font-weight: 700;
-            color: #1e3a5f;
-            letter-spacing: 0.5px;
-            padding: 10px 0 4px 0;
-            border-bottom: 2px solid #2d6a9f;
-            margin-bottom: 12px;
-        }
-        .badge-ex { background:#1a7a4a; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
-        .badge-mb { background:#2d6a9f; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
-        .badge-b  { background:#4a90d9; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
-        .badge-rp { background:#e8a020; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
-        .badge-rm { background:#d4601a; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
-        .badge-m  { background:#c0392b; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("## 📈 Análisis Estadístico Individual")
+    st.header("📈 Análisis Estadístico Individual")
     st.markdown("---")
-
+    
     col1, col2, col3 = st.columns(3)
     with col1:
         curso_stats = st.selectbox(
@@ -1600,16 +1072,6 @@ elif st.session_state.accion_actual == "estadistica":
             df_stats = df_stats[df_stats["Curso"] == curso_stats]
         if alumno_stats != "Todos":
             df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
-    except Exception:
-        df_stats = pd.DataFrame()
-        if GOOGLE_SHEETS_DISPONIBLE:
-            df_sheets = cargar_datos_desde_sheets(trimestre_stats)
-            if df_sheets is not None and not df_sheets.empty:
-                df_stats = df_sheets
-                if curso_stats != "Todos":
-                    df_stats = df_stats[df_stats["Curso"] == curso_stats]
-                if alumno_stats != "Todos":
-                    df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
 
         if not df_stats.empty:
             for idx, row in df_stats.iterrows():
@@ -1629,8 +1091,7 @@ elif st.session_state.accion_actual == "estadistica":
                     """, unsafe_allow_html=True)
 
                     # ── ASISTENCIA ──────────────────────────
-                    st.markdown('<div class="seccion-titulo">📋 ASISTENCIA</div>',
-                                unsafe_allow_html=True)
+                    st.markdown('<div class="seccion-titulo">📋 ASISTENCIA</div>', unsafe_allow_html=True)
 
                     columnas_asistencia = [
                         col for col in df_stats.columns
@@ -1688,8 +1149,7 @@ elif st.session_state.accion_actual == "estadistica":
                     st.markdown("<br>", unsafe_allow_html=True)
 
                     # ── EVALUACIONES ────────────────────────
-                    st.markdown('<div class="seccion-titulo">📝 EVALUACIONES</div>',
-                                unsafe_allow_html=True)
+                    st.markdown('<div class="seccion-titulo">📝 EVALUACIONES</div>', unsafe_allow_html=True)
 
                     evaluaciones_detalle = []
                     calificaciones = []
@@ -1768,10 +1228,7 @@ elif st.session_state.accion_actual == "estadistica":
                         st.markdown("<br>", unsafe_allow_html=True)
 
                         # ── RESUMEN GENERAL ──────────────────
-                        st.markdown(
-                            '<div class="seccion-titulo">🏆 RESUMEN GENERAL</div>',
-                            unsafe_allow_html=True
-                        )
+                        st.markdown('<div class="seccion-titulo">🏆 RESUMEN GENERAL</div>', unsafe_allow_html=True)
 
                         promedio_general = (nota_asistencia + promedio_eval) / 2
 
@@ -1816,4 +1273,130 @@ elif st.session_state.accion_actual == "estadistica":
         st.error(f"Error: {e}")
         st.info("📊 Primero agregá datos simulados desde el Dashboard.")
 
-st.markdown("---")
+elif st.session_state.accion_actual == "reporte":
+    st.header("📊 Reporte Individual Completo")
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        curso_reporte = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="reporte_curso")
+    with col2:
+        trimestre_reporte = st.selectbox("📅 Seleccionar Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="reporte_trimestre")
+    with col3:
+        alumnos_disponibles = obtener_alumnos_disponibles()
+        alumno_reporte = st.selectbox("👤 Seleccionar Alumno:", alumnos_disponibles, key="reporte_alumno")
+    
+    st.markdown("---")
+    
+    try:
+        # Intentar leer desde Excel local
+        df_reporte = pd.read_excel(archivo_excel, sheet_name=trimestre_reporte)
+        # Si está vacío, intentar desde Sheets
+        if df_reporte.empty and GOOGLE_SHEETS_DISPONIBLE:
+            df_sheets = cargar_datos_desde_sheets(trimestre_reporte)
+            if df_sheets is not None and not df_sheets.empty:
+                guardar_datos_excel(df_sheets, trimestre_reporte, archivo_excel)
+                df_reporte = df_sheets
+
+        if curso_reporte != "Todos":
+            df_reporte = df_reporte[df_reporte["Curso"] == curso_reporte]
+        
+        if alumno_reporte != "Todos":
+            df_reporte = df_reporte[df_reporte["Apellido y Nombre"] == alumno_reporte]
+        
+        if not df_reporte.empty:
+            for idx, row in df_reporte.iterrows():
+                if pd.notna(row["Apellido y Nombre"]):
+                    st.write(f"# 📊 Reporte Individual: {row['Apellido y Nombre']}")
+                    st.write(f"**📂 Curso:** {row['Curso']}")
+                    st.write(f"**📅 Trimestre:** {trimestre_reporte}")
+                    st.markdown("---")
+                    
+                    st.write("## 📋 Asistencia Detallada")
+                    columnas_asistencia = [col for col in df_reporte.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                    asistencia_data = []
+                    presentes = 0
+                    ausentes = 0
+                    
+                    for col in columnas_asistencia:
+                        if pd.notna(row[col]):
+                            estado = row[col]
+                            asistencia_data.append({
+                                "Fecha": col,
+                                "Estado": estado
+                            })
+                            if estado == "Presente":
+                                presentes += 1
+                            else:
+                                ausentes += 1
+                    
+                    if asistencia_data:
+                        df_asistencia = pd.DataFrame(asistencia_data)
+                        st.dataframe(df_asistencia, use_container_width=True)
+                        
+                        total_dias = presentes + ausentes
+                        porcentaje = (presentes / total_dias * 100) if total_dias > 0 else 0
+                        nota_asistencia = calcular_nota_asistencia(presentes, total_dias)
+                        
+                        st.write(f"**📊 Resumen:** {presentes} presentes, {ausentes} ausentes ({porcentaje:.1f}%)")
+                        st.write(f"**📊 Nota Asistencia:** {nota_asistencia}")
+                    
+                    st.markdown("---")
+                    st.write("## 📝 Evaluaciones Detalladas")
+                    evaluaciones_data = []
+                    calificaciones = []
+                    
+                    for i in range(1, 7):
+                        eval_col = f"Eval {i}"
+                        calif_col = f"Calif {i}"
+                        if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
+                            calif_num = calificacion_a_numero(row[calif_col])
+                            evaluaciones_data.append({
+                                "Evaluación": row[eval_col],
+                                "Calificación": row[calif_col],
+                                "Valor Numérico": calif_num
+                            })
+                            calificaciones.append(calif_num)
+                    
+                    if evaluaciones_data:
+                        df_evaluaciones = pd.DataFrame(evaluaciones_data)
+                        st.dataframe(df_evaluaciones, use_container_width=True)
+                        
+                        if calificaciones:
+                            promedio_eval_num = sum(calificaciones) / len(calificaciones)
+                            max_calificacion = max(calificaciones)
+                            min_calificacion = min(calificaciones)
+                            
+                            st.write(f"**📊 Promedio Evaluaciones:** {promedio_eval_num:.1f}")
+                            st.write(f"**📊 Calificación Más Alta:** {max_calificacion}")
+                            st.write(f"**📊 Calificación Más Baja:** {min_calificacion}")
+                            
+                            st.markdown("---")
+                            st.write("#### 📈 Gráfico de Desempeño")
+                            crear_grafico_evaluaciones(evaluaciones_data, row["Apellido y Nombre"])
+                    
+                    st.markdown("---")
+                    st.write("## 📈 Resumen General del Alumno")
+                    nota_asistencia_num = calcular_nota_asistencia(presentes, total_dias)
+                    promedio_eval_num = sum(calificaciones) / len(calificaciones) if calificaciones else 0
+                    promedio_general_num = (nota_asistencia_num + promedio_eval_num) / 2 if calificaciones else nota_asistencia_num
+                    
+                    st.write(f"**📊 Nota Final Asistencia:** {nota_asistencia_num}")
+                    st.write(f"**📊 Promedio Final Evaluaciones:** {promedio_eval_num}")
+                    st.write(f"**📈 Promedio General Final:** {promedio_general_num:.1f}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("📊 Nota Final Asistencia", nota_asistencia_num)
+                    with col2:
+                        st.metric("📈 Promedio Final Evaluaciones", promedio_eval_num)
+                    
+                    st.markdown("---")
+                    st.metric("📈 Promedio General Final", promedio_general_num)
+                    
+                    break
+        else:
+            st.info("📋 No hay datos para mostrar")
+    except Exception as e:
+        st.error(f"Error: {e}")
+        st.info("📊 Agrega datos simulados para probar")
