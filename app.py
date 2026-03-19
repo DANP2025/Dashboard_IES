@@ -125,12 +125,3 @@ st.markdown("""
     Email destino: solpeschuk@gmail.com
 </div>
 """, unsafe_allow_html=True)
-```
-
-Y el `requirements.txt`:
-```
-streamlit
-gspread
-google-auth
-google-api-python-client
-pandas
