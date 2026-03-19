@@ -200,7 +200,7 @@ def agregar_datos_simulados_completos():
                         
                         presentes = sum(1 for v in asistencia_data.values() if v == "Presente")
                         totales = len(asistencia_data)
-                        porcentaje = (presentes / totales) * 100 if totales > 0 else 0
+                        porcentaje = (presentes / totales * 100) if totales > 0 else 0
                         
                         if porcentaje >= 80:
                             nota_asistencia = 10
@@ -387,7 +387,7 @@ if st.session_state.accion_actual == "dashboard":
         if st.button("🔄 Actualizar Datos", type="secondary"):
             st.rerun()
     with col3:
-        st.write("")  # Espacio
+        st.write("")
 
 elif st.session_state.accion_actual == "agregar_alumno":
     st.header("👤 Agregar Nuevo Alumno")
