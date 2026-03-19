@@ -18,16 +18,17 @@ st.set_page_config(
 )
 
 st.title("🔧 Google Drive Backup")
-st.write("🚀 Configuración automática - Credenciales seguras vía Streamlit Secrets")
+st.write("🚀 Configuración segura vía Streamlit Secrets")
 
-# ✅ SEGURO: las credenciales vienen de Streamlit Secrets, no del código
 try:
     CREDENTIALS = dict(st.secrets["gcp_service_account"])
-    st.success("✅ Credenciales cargadas correctamente desde Secrets!")
+    # ✅ CORRECCIÓN: forzar que los \n sean saltos de línea reales
+    CREDENTIALS["private_key"] = CREDENTIALS["private_key"].replace("\\n", "\n")
+    st.success("✅ Credenciales cargadas correctamente!")
     st.info(f"📧 Email: {CREDENTIALS['client_email']}")
     st.info(f"🆔 Project ID: {CREDENTIALS['project_id']}")
-except Exception:
-    st.error("❌ No se encontraron las credenciales en Streamlit Secrets.")
+except Exception as e:
+    st.error(f"❌ No se encontraron las credenciales: {e}")
     st.info("👉 Andá a Settings → Secrets en Streamlit Cloud y configurá las credenciales.")
     st.stop()
 
@@ -56,7 +57,6 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
             st.info(f"📁 Spreadsheet creado: {spreadsheet.url}")
             st.info("🎉 ¡Google Drive Backup está ahora ACTIVO!")
 
-            # Datos de prueba
             test_data = pd.DataFrame({
                 'Test': ['Backup Configurado Automáticamente'],
                 'Fecha': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
