@@ -53,7 +53,7 @@ def crear_excel_si_no_existe():
         wb.remove(wb.active)
         for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
             ws = wb.create_sheet(title=trimestre)
-            headers = ["Apellido y Nombre", "Curso"] + [f"Mar-{i:02d}" for i in range(1, 32)] + [f"Abr-{i:02d}" for i in range(1, 31)] + [f"May-{i:02d}" for i in range(1, 32)] + ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Nota Final Evaluaciones", "Observaciones"]
+            headers = ["Apellido y Nombre", "Curso"] + [f"Mar-{i:02d}" for i in range(1, 32)] + [f"Abr-{i:02d}" for i in range(1, 31)] + [f"May-{i:02d}" for i in range(1, 32)] + ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6", "Nota Final Evaluaciones", "Observaciones"]
             for col_num, header in enumerate(headers, 1):
                 cell = ws.cell(row=1, column=col_num, value=header)
                 cell.font = Font(bold=True)
@@ -74,6 +74,12 @@ def agregar_datos_simulados_completos():
                 "Alvarez Moreno, Isabel Cristina"
             ]
             
+            # Agregar 5 nombres adicionales para EF 1A
+            nombres_adicionales_ef1a = [
+                "Hernández González, Luciana Beatriz", "Mendoza Silva, Valentina Sofía", "Castro Ramos, Isabella Gabriela",
+                "Vargas Morales, Emilia Alejandra", "Ortiz Ruiz, Camila Victoria"
+            ]
+            
             cursos = ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
             
             # Generar datos para los 3 trimestres
@@ -82,7 +88,13 @@ def agregar_datos_simulados_completos():
                 datos_trimestre = []
                 
                 for curso in cursos:
-                    for i, nombre in enumerate(nombres_femeninos[:10]):  # 10 alumnas por curso
+                    # Determinar cuántos alumnos por curso
+                    if curso == "EF 1A":
+                        nombres_curso = nombres_femeninos[:10] + nombres_adicionales_ef1a  # 15 alumnos
+                    else:
+                        nombres_curso = nombres_femeninos[:10]  # 10 alumnos
+                    
+                    for i, nombre in enumerate(nombres_curso):
                         # Generar asistencia aleatoria para el trimestre
                         asistencia_data = {}
                         for dia in range(1, 32):
@@ -108,10 +120,10 @@ def agregar_datos_simulados_completos():
                         else:
                             nota_asistencia = 5   # M
                         
-                        # Generar 4 evaluaciones por trimestre con datos falsos
+                        # Generar 6 evaluaciones por trimestre con datos falsos
                         tipos_eval = ["Diagnóstico", "Físico", "Técnico", "Desempeño global"]
                         calificaciones = ["M", "R-", "R+", "B", "MB", "EX"]
-                        nombres_eval = ["Evaluación Diagnóstica", "Test Físico", "Proyecto Técnico", "Evaluación Global"]
+                        nombres_eval = ["Evaluación Diagnóstica", "Test Físico", "Proyecto Técnico", "Evaluación Global", "Trabajo Práctico", "Exposición Oral"]
                         
                         evaluacion_data = {
                             "Apellido y Nombre": nombre,
@@ -121,8 +133,8 @@ def agregar_datos_simulados_completos():
                             "Observaciones": f"Alumna {curso}, desempeño {'excelente' if nota_asistencia >= 8 else 'regular' if nota_asistencia >= 6 else 'necesita mejorar'}"
                         }
                         
-                        # Agregar 4 evaluaciones con datos falsos
-                        for j in range(1, 5):
+                        # Agregar 6 evaluaciones con datos falsos
+                        for j in range(1, 7):
                             eval_nombre = nombres_eval[j-1]
                             eval_calif = random.choice(calificaciones)
                             evaluacion_data[f"Eval {j}"] = eval_nombre
@@ -130,7 +142,7 @@ def agregar_datos_simulados_completos():
                         
                         # Calcular promedio final de evaluaciones
                         califs_numericas = []
-                        for j in range(1, 5):
+                        for j in range(1, 7):
                             calif = evaluacion_data[f"Calif {j}"]
                             if calif == "M": califs_numericas.append(4)
                             elif calif == "R-": califs_numericas.append(6)
@@ -184,8 +196,8 @@ def agregar_nuevo_alumno(nombre, curso):
                     elif dia <= 92:  # Mayo
                         nuevo_alumno[f"May-{(dia-61):02d}"] = "Ausente"
                 
-                # Agregar evaluaciones
-                for j in range(1, 5):
+                # Agregar evaluaciones (ahora 6)
+                for j in range(1, 7):
                     nuevo_alumno[f"Eval {j}"] = f"Evaluación {j}"
                     nuevo_alumno[f"Calif {j}"] = "B"
                 
@@ -255,17 +267,20 @@ archivo_excel = crear_excel_si_no_existe()
 if st.session_state.accion_actual == "dashboard":
     st.header("📊 Dashboard General")
     
-    # Métricas principales
+    # Métricas principales actualizadas
+    total_alumnos = 65  # 60 + 5 adicionales en EF 1A
+    total_evaluaciones = total_alumnos * 6 * 3  # 6 evaluaciones por trimestre
+    
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("👥 Total Alumnos", "60", delta="52")
+    with col1: st.metric("👥 Total Alumnos", total_alumnos, delta="57")
     with col2: st.metric("📊 Promedio Asistencia", "82%", delta="3%")
-    with col3: st.metric("📝 Total Evaluaciones", "720", delta="705")  # 60 alumnos x 4 evals x 3 trimestres
+    with col3: st.metric("📝 Total Evaluaciones", total_evaluaciones, delta=f"+{total_evaluaciones - 720}")
     with col4: st.metric("📈 Promedio General", "7.6", delta="0.2")
     
     st.markdown("---")
     st.subheader("📂 Resumen por Cursos")
     resumen_cursos = [
-        {"Curso": "EF 1A", "Alumnos": 10, "Asistencia": "85%", "Promedio": "8.2"},
+        {"Curso": "EF 1A", "Alumnos": 15, "Asistencia": "85%", "Promedio": "8.2"},  # 15 ahora
         {"Curso": "EF 2A", "Alumnos": 10, "Asistencia": "78%", "Promedio": "7.5"},
         {"Curso": "EF 1B", "Alumnos": 10, "Asistencia": "90%", "Promedio": "8.8"},
         {"Curso": "EF 2B", "Alumnos": 10, "Asistencia": "82%", "Promedio": "7.9"},
@@ -309,9 +324,10 @@ if st.session_state.accion_actual == "dashboard":
         if st.button("📊 Agregar Datos Simulados Completos", type="primary"):
             if agregar_datos_simulados_completos():
                 st.success("✅ Datos simulados agregados!")
-                st.info("📊 60 alumnas agregadas (10 por curso)")
-                st.info("📝 4 evaluaciones por trimestre por alumna")
+                st.info(f"📊 {total_alumnos} alumnas agregadas")
+                st.info("📝 6 evaluaciones por trimestre por alumna")
                 st.info("📅 Datos para los 3 trimestres")
+                st.info("🎯 EF 1A tiene 15 alumnas (5 adicionales)")
                 st.rerun()
     with col2:
         if st.button("🔄 Actualizar Datos", type="secondary"):
@@ -484,26 +500,12 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.header("📝 Gestión de Evaluaciones")
     st.markdown("---")
     
-    # Filtros visuales
-    col1, col2, col3 = st.columns(3)
+    # Filtros visuales (SIN filtro de número de evaluación)
+    col1, col2 = st.columns(2)
     with col1:
         curso_eval = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="eval_curso")
     with col2:
         trimestre_eval = st.selectbox("📅 Seleccionar Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="eval_trimestre")
-    with col3:
-        # Obtener número de evaluaciones existentes
-        try:
-            df_temp = pd.read_excel(archivo_excel, sheet_name=trimestre_eval)
-            if not df_temp.empty:
-                eval_cols = [col for col in df_temp.columns if col.startswith("Eval ")]
-                num_evals = len(eval_cols)
-                opciones_eval = list(range(1, num_evals + 1))
-            else:
-                opciones_eval = [1, 2, 3, 4]
-        except:
-            opciones_eval = [1, 2, 3, 4]
-        
-        numero_evaluacion = st.selectbox("🔢 Evaluación:", opciones_eval, key="numero_evaluacion")
     
     st.markdown("---")
     
@@ -524,9 +526,9 @@ elif st.session_state.accion_actual == "evaluaciones":
                     st.session_state.nuevas_evaluaciones.append({
                         "nombre": nuevo_nombre_eval,
                         "tipo": nuevo_tipo_eval,
-                        "numero": len(st.session_state.nuevas_evaluaciones) + 5  # Empezar desde 5
+                        "numero": len(st.session_state.nuevas_evaluaciones) + 7  # Empezar desde 7 (después de las 6 base)
                     })
-                    st.success(f"✅ Evaluación '{nuevo_nombre_eval}' agregada al sistema!")
+                    st.success(f"✅ Evaluación '{nuevo_nombre_eval}' agregada!")
                     st.info(f"📋 Tipo: {nuevo_tipo_eval}")
                     st.rerun()
                 else:
@@ -544,7 +546,7 @@ elif st.session_state.accion_actual == "evaluaciones":
         
         if not df_evaluaciones.empty:
             # Crear tabla visual con diseño en línea
-            st.write(f"📝 **Evaluaciones** - Tipo + Nombre + Calificación en la misma línea")
+            st.write("📝 **Evaluaciones** - Tipo + Nombre + Calificación en la misma línea")
             
             # Inicializar estado para cambios
             if 'evaluaciones_cambios' not in st.session_state:
@@ -556,8 +558,8 @@ elif st.session_state.accion_actual == "evaluaciones":
                     # Encabezado de la alumna
                     st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
                     
-                    # Mostrar evaluaciones existentes en línea
-                    for j in range(1, 5):  # 4 evaluaciones base
+                    # Mostrar evaluaciones existentes en línea (ahora 6)
+                    for j in range(1, 7):  # 6 evaluaciones base
                         eval_col = f"Eval {j}"
                         calif_col = f"Calif {j}"
                         
@@ -610,9 +612,8 @@ elif st.session_state.accion_actual == "evaluaciones":
                                 "calificacion": calificacion
                             }
                     
-                    # Mostrar nuevas evaluaciones agregadas debajo de las existentes
+                    # Mostrar nuevas evaluaciones agregadas directamente (sin título)
                     if st.session_state.nuevas_evaluaciones:
-                        st.write("#### 🆕 Nuevas Evaluaciones Agregadas:")
                         for nueva_eval in st.session_state.nuevas_evaluaciones:
                             col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
                             
@@ -664,7 +665,7 @@ elif st.session_state.accion_actual == "evaluaciones":
                         
                         # Recalcular promedio final
                         calificaciones = []
-                        for i in range(1, 5):
+                        for i in range(1, 7):  # Ahora 6 evaluaciones
                             calif_col_temp = f"Calif {i}"
                             if pd.notna(df_evaluaciones.at[idx, calif_col_temp]):
                                 calificaciones.append(calificacion_a_numero(df_evaluaciones.at[idx, calif_col_temp]))
@@ -694,7 +695,7 @@ elif st.session_state.accion_actual == "evaluaciones":
                 
                 for idx, row in df_evaluaciones.iterrows():
                     if pd.notna(row["Apellido y Nombre"]):
-                        for j in range(1, 5):
+                        for j in range(1, 7):  # 6 evaluaciones
                             calif_col = f"Calif {j}"
                             calif = row.get(calif_col)
                             if pd.notna(calif) and calif in calificaciones_contadas:
@@ -798,7 +799,7 @@ elif st.session_state.accion_actual == "reporte":
                         calificaciones = []
                         notas_individuales = []
                         
-                        for i in range(1, 5):  # 4 evaluaciones
+                        for i in range(1, 7):  # 6 evaluaciones
                             eval_col = f"Eval {i}"
                             calif_col = f"Calif {i}"
                             if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
@@ -837,7 +838,7 @@ elif st.session_state.accion_actual == "reporte":
                         # Evaluaciones
                         calificaciones = []
                         notas_individuales = []
-                        for i in range(1, 5):  # 4 evaluaciones
+                        for i in range(1, 7):  # 6 evaluaciones
                             calif_col = f"Calif {i}"
                             if pd.notna(row[calif_col]):
                                 calificaciones.append(calificacion_a_numero(row[calif_col]))
@@ -960,7 +961,7 @@ elif st.session_state.accion_actual == "estadistica":
                 
                 for idx, row in df_stats.iterrows():
                     if pd.notna(row["Apellido y Nombre"]):
-                        for i in range(1, 5):  # 4 evaluaciones por trimestre
+                        for i in range(1, 7):  # 6 evaluaciones por trimestre
                             calif_col = f"Calif {i}"
                             if pd.notna(row[calif_col]):
                                 calif = str(row[calif_col]).upper().strip()
@@ -1032,7 +1033,7 @@ elif st.session_state.accion_actual == "estadistica":
                         nota_asistencia = calcular_nota_asistencia(presentes, totales)
                         
                         calificaciones = []
-                        for i in range(1, 5):  # 4 evaluaciones
+                        for i in range(1, 7):  # 6 evaluaciones
                             calif_col = f"Calif {i}"
                             if pd.notna(row[calif_col]):
                                 calificaciones.append(calificacion_a_numero(row[calif_col]))
@@ -1062,8 +1063,8 @@ st.markdown("""
 <div style='text-align: center; color: #2E7D32; padding: 20px; border-top: 2px solid #4CAF50; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);'>
     <p style='color: white; font-size: 16px; margin: 5px 0;'>
         <span style='color: #4CAF50;'>✅</span> Sistema optimizado para educación física<br>
-        <span style='color: #4CAF50;'>👥</span> 60 alumnas simuladas<br>
-        <span style='color: #4CAF50;'>📝</span> 4 evaluaciones por trimestre<br>
+        <span style='color: #4CAF50;'>👥</span> 65 alumnas simuladas<br>
+        <span style='color: #4CAF50;'>📝</span> 6 evaluaciones por trimestre<br>
         <span style='color: #4CAF50;'>📊</span> Estadísticas completas
     </p>
     <small style='color: rgba(255,255,255,0.8);'>Plataforma educativa profesional</small>
