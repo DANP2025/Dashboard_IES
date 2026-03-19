@@ -9,13 +9,61 @@ import random
 
 st.set_page_config(page_title="Sistema Educativo", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
 
-# Verificar si los secrets están disponibles
 GOOGLE_SHEETS_DISPONIBLE = False
 try:
     if "gcp_service_account" in st.secrets:
         GOOGLE_SHEETS_DISPONIBLE = True
 except Exception:
     GOOGLE_SHEETS_DISPONIBLE = False
+
+def crear_excel_si_no_existe():
+    archivo_excel = "sistema_educativo.xlsx"
+    if not os.path.exists(archivo_excel):
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+        for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
+            ws = wb.create_sheet(title=trimestre)
+            headers = ["Apellido y Nombre", "Curso"] + [f"Mar-{i:02d}" for i in range(1, 32)] + [f"Abr-{i:02d}" for i in range(1, 31)] + [f"May-{i:02d}" for i in range(1, 32)] + ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6", "Nota Final Evaluaciones", "Observaciones"]
+            for col_num, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_num, value=header)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        wb.save(archivo_excel)
+    return archivo_excel
+
+def calcular_nota_asistencia(presentes, totales):
+    if totales == 0:
+        return 0
+    porcentaje = (presentes / totales) * 100
+    if porcentaje >= 80:
+        return 10
+    elif porcentaje >= 51:
+        return 8
+    else:
+        return 5
+
+def calificacion_a_numero(calif):
+    calif = str(calif).upper().strip()
+    if calif == "M": return 4
+    elif calif == "R-": return 6
+    elif calif == "R+": return 7
+    elif calif == "B": return 8
+    elif calif == "MB": return 9
+    elif calif == "EX": return 10
+    else:
+        try: return float(calif)
+        except: return 0
+
+def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
+    """Función para guardar datos en Excel con manejo de errores"""
+    try:
+        with pd.ExcelWriter(archivo_excel, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Error guardando en Excel: {e}")
+        return False
 
 def sincronizar_google_sheets():
     """Sincroniza los datos locales con Google Sheets"""
@@ -143,6 +191,49 @@ def sincronizar_google_sheets():
 
     except Exception as e:
         return False, str(e)
+
+def cargar_datos_desde_sheets(nombre_trimestre):
+    """Carga datos desde Google Sheets si no existe el Excel local"""
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return None
+
+        creds_info = {
+            "type": st.secrets["gcp_service_account"]["type"],
+            "project_id": st.secrets["gcp_service_account"]["project_id"],
+            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+            "private_key": st.secrets["gcp_service_account"]["private_key"],
+            "client_email": st.secrets["gcp_service_account"]["client_email"],
+            "client_id": st.secrets["gcp_service_account"]["client_id"],
+            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+        }
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        client = gspread.authorize(creds)
+
+        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+
+        try:
+            ws = spreadsheet.worksheet(nombre_trimestre)
+            datos = ws.get_all_records()
+            if datos:
+                return pd.DataFrame(datos)
+        except Exception:
+            return None
+
+        return None
+    except Exception:
+        return None
 
 # Sidebar con ACCIONES
 st.sidebar.header("🎯 ACCIONES")
@@ -481,6 +572,29 @@ def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
         st.caption(f"📈 Rendimiento en Evaluaciones - {nombre_alumno}")
 
 archivo_excel = crear_excel_si_no_existe()
+
+# Si el Excel no tiene datos (Streamlit Cloud reinició),
+# restaurar desde Google Sheets automáticamente
+if GOOGLE_SHEETS_DISPONIBLE:
+    try:
+        wb_check = openpyxl.load_workbook(archivo_excel)
+        ws_check = wb_check["1 Trimestre"]
+        tiene_datos = ws_check.max_row > 1
+        wb_check.close()
+
+        if not tiene_datos:
+            with st.spinner("🔄 Restaurando datos desde Google Sheets..."):
+                restaurado = False
+                for trimestre_num in range(1, 4):
+                    nombre_trimestre = f"{trimestre_num} Trimestre"
+                    df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
+                    if df_sheets is not None and not df_sheets.empty:
+                        guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel)
+                        restaurado = True
+                if restaurado:
+                    st.success("✅ Datos restaurados desde Google Sheets!")
+    except Exception:
+        pass
 
 # Mostrar contenido según la acción seleccionada
 if st.session_state.accion_actual == "dashboard":
