@@ -388,7 +388,209 @@ def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
         st.error(f"Error guardando en Excel: {e}")
         return False
 
-def agregar_datos_simulados_completos():
+def generar_backup_detalles():
+    """Generar backup detallado en Excel con todas las columnas solicitadas"""
+    try:
+        archivo_excel = "sistema_educativo.xlsx"
+        if not os.path.exists(archivo_excel):
+            return False
+        
+        # Crear nuevo Excel para backup
+        backup_filename = f"backup_detalles_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        wb_backup = openpyxl.Workbook()
+        wb_backup.remove(wb_backup.active)
+        
+        # Procesar cada trimestre
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+            ws_backup = wb_backup.create_sheet(title=nombre_trimestre)
+            
+            # Encabezados del backup
+            headers_backup = [
+                "Fecha y Hora Backup", "Alumno", "Curso", "Trimestre",
+                "Asistencia", "Evaluación", "Tipo Evaluación", "Calificación"
+            ]
+            
+            # Escribir encabezados
+            for col_num, header in enumerate(headers_backup, 1):
+                cell = ws_backup.cell(row=1, column=col_num, value=header)
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center")
+            
+            # Leer datos del trimestre
+            df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+            
+            if not df_trimestre.empty:
+                row_num = 2
+                for idx, row in df_trimestre.iterrows():
+                    if pd.notna(row["Apellido y Nombre"]):
+                        # Procesar asistencia
+                        columnas_asistencia = [col for col in df_trimestre.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
+                        presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
+                        totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                        porcentaje_asistencia = (presentes / totales * 100) if totales > 0 else 0
+                        
+                        # Escribir fila de asistencia
+                        ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                        ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
+                        ws_backup.cell(row=row_num, column=3, value=row["Curso"])
+                        ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
+                        ws_backup.cell(row=row_num, column=5, value=f"{presentes}/{totales} ({porcentaje_asistencia:.1f}%)")
+                        ws_backup.cell(row=row_num, column=6, value="")  # Evaluación vacía para fila de asistencia
+                        ws_backup.cell(row=row_num, column=7, value="")  # Tipo vacío para fila de asistencia
+                        ws_backup.cell(row=row_num, column=8, value="")  # Calificación vacía para fila de asistencia
+                        row_num += 1
+                        
+                        # Procesar evaluaciones
+                        for j in range(1, 7):  # 6 evaluaciones
+                            eval_col = f"Eval {j}"
+                            calif_col = f"Calif {j}"
+                            
+                            if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
+                                ws_backup.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                ws_backup.cell(row=row_num, column=2, value=row["Apellido y Nombre"])
+                                ws_backup.cell(row=row_num, column=3, value=row["Curso"])
+                                ws_backup.cell(row=row_num, column=4, value=nombre_trimestre)
+                                ws_backup.cell(row=row_num, column=5, value="")  # Asistencia vacía para fila de evaluación
+                                ws_backup.cell(row=row_num, column=6, value=row[eval_col])
+                                ws_backup.cell(row=row_num, column=7, value=row.get("Tipo Evaluación", ""))
+                                ws_backup.cell(row=row_num, column=8, value=row[calif_col])
+                                row_num += 1
+        
+        # Guardar backup
+        wb_backup.save(backup_filename)
+        return True
+    except Exception as e:
+        st.error(f"Error generando backup: {e}")
+        return False
+
+def sincronizar_google_sheets():
+    """Sincroniza los datos locales con Google Sheets"""
+    try:
+        if not GOOGLE_SHEETS_DISPONIBLE:
+            return False, "Secrets de Google no configurados"
+        
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        creds_info = {
+            "type": st.secrets["gcp_service_account"]["type"],
+            "project_id": st.secrets["gcp_service_account"]["project_id"],
+            "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+            "private_key": st.secrets["gcp_service_account"]["private_key"],
+            "client_email": st.secrets["gcp_service_account"]["client_email"],
+            "client_id": st.secrets["gcp_service_account"]["client_id"],
+            "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+            "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+        }
+
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        client = gspread.authorize(creds)
+
+        SPREADSHEET_ID = st.secrets["gcp_service_account"]["sheet_id"]
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+
+        archivo_excel = "sistema_educativo.xlsx"
+        if not os.path.exists(archivo_excel):
+            return False, "No existe el archivo Excel local. Primero agregá datos simulados."
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        headers = [
+            "Fecha y Hora Actualización", "Apellido y Nombre", "Curso", "Trimestre",
+            "Días Presentes", "Días Ausentes", "% Asistencia", "Nota Asistencia",
+            "Eval 1 - Nombre", "Eval 1 - Calif",
+            "Eval 2 - Nombre", "Eval 2 - Calif",
+            "Eval 3 - Nombre", "Eval 3 - Calif",
+            "Eval 4 - Nombre", "Eval 4 - Calif",
+            "Eval 5 - Nombre", "Eval 5 - Calif",
+            "Eval 6 - Nombre", "Eval 6 - Calif",
+            "Promedio Final Evaluaciones"
+        ]
+
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+
+            try:
+                ws = spreadsheet.worksheet(nombre_trimestre)
+            except Exception:
+                ws = spreadsheet.add_worksheet(
+                    title=nombre_trimestre, rows=500, cols=25
+                )
+
+            try:
+                df = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+            except Exception:
+                continue
+
+            if df.empty:
+                continue
+
+            rows_data = [headers]
+
+            for _, row in df.iterrows():
+                if pd.isna(row.get("Apellido y Nombre")):
+                    continue
+
+                columnas_asistencia = [
+                    col for col in df.columns
+                    if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-"])
+                ]
+                presentes = sum(
+                    1 for col in columnas_asistencia
+                    if pd.notna(row.get(col)) and row.get(col) == "Presente"
+                )
+                totales = sum(
+                    1 for col in columnas_asistencia
+                    if pd.notna(row.get(col))
+                )
+                ausentes = totales - presentes
+                porcentaje = round((presentes / totales * 100), 1) if totales > 0 else 0
+                nota_asistencia = calcular_nota_asistencia(presentes, totales)
+
+                fila = [
+                    timestamp,
+                    str(row.get("Apellido y Nombre", "")),
+                    str(row.get("Curso", "")),
+                    nombre_trimestre,
+                    presentes,
+                    ausentes,
+                    f"{porcentaje}%",
+                    nota_asistencia,
+                ]
+
+                for j in range(1, 7):
+                    fila.append(str(row.get(f"Eval {j}", "")))
+                    fila.append(str(row.get(f"Calif {j}", "")))
+
+                fila.append(str(row.get("Nota Final Evaluaciones", "")))
+                rows_data.append(fila)
+
+            ws.clear()
+            ws.update(rows_data, value_input_option="USER_ENTERED")
+
+            ws.format("A1:U1", {
+                "backgroundColor": {
+                    "red": 0.212, "green": 0.380, "blue": 0.573
+                },
+                "textFormat": {
+                    "bold": True,
+                    "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
+                },
+                "horizontalAlignment": "CENTER"
+            })
+
+        return True, f"Sincronizado correctamente a las {timestamp}"
+
+    except Exception as e:
+        return False, str(e)
     archivo_excel = "sistema_educativo.xlsx"
     if os.path.exists(archivo_excel):
         try:
@@ -618,12 +820,21 @@ if st.session_state.accion_actual == "dashboard":
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📊 Agregar Datos Simulados Completos", type="primary"):
-            if agregar_datos_simulados_completos():
-                st.success("✅ Datos simulados agregados!")
-                st.info(f"📊 {total_alumnos} alumnas agregadas")
-                st.info("📝 6 evaluaciones por trimestre por alumna")
-                st.info("📅 Datos para los 3 trimestres")
-                st.rerun()
+            with st.spinner("Generando datos..."):
+                if agregar_datos_simulados_completos():
+                    st.success(f"✅ Datos simulados agregados!")
+                    st.info("� 6 evaluaciones por trimestre por alumno")
+                    st.info("� Datos para los 3 trimestres")
+                    # Sincronizar inmediatamente con Google Sheets
+                    with st.spinner("Sincronizando con Google Sheets..."):
+                        ok, mensaje = sincronizar_google_sheets()
+                        if ok:
+                            st.success(f"✅ Google Sheets actualizado!")
+                        else:
+                            st.warning(f"⚠️ Sheets: {mensaje}")
+                    st.rerun()
+                else:
+                    st.error("❌ Error generando datos")
     with col2:
         if st.button("🔄 Actualizar Datos", type="secondary"):
             st.rerun()
@@ -1190,115 +1401,289 @@ elif st.session_state.accion_actual == "reporte":
         st.info("📊 Agrega datos simulados para probar")
 
 elif st.session_state.accion_actual == "estadistica":
-    st.header("📈 Análisis Estadístico Individual")
+    # CSS personalizado para estadística
+    st.markdown("""
+    <style>
+        .stat-card {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 8px 0;
+            color: white;
+        }
+        .stat-title {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #a8c8e8;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+        }
+        .stat-sub {
+            font-size: 12px;
+            color: #7fb3d3;
+            margin-top: 2px;
+        }
+        .seccion-titulo {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e3a5f;
+            letter-spacing: 0.5px;
+            padding: 10px 0 4px 0;
+            border-bottom: 2px solid #2d6a9f;
+            margin-bottom: 12px;
+        }
+        .badge-ex { background:#1a7a4a; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
+        .badge-mb { background:#2d6a9f; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
+        .badge-b  { background:#4a90d9; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
+        .badge-rp { background:#e8a020; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
+        .badge-rm { background:#d4601a; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
+        .badge-m  { background:#c0392b; color:white; padding:3px 10px; border-radius:20px; font-weight:700; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("## 📈 Análisis Estadístico Individual")
     st.markdown("---")
-    
+
     col1, col2, col3 = st.columns(3)
     with col1:
-        curso_stats = st.selectbox("📂 Seleccionar Curso:", ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"], key="stats_curso")
+        curso_stats = st.selectbox(
+            "📂 Curso:",
+            ["Todos", "EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"],
+            key="stats_curso"
+        )
     with col2:
-        trimestre_stats = st.selectbox("📅 Seleccionar Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="stats_trimestre")
+        trimestre_stats = st.selectbox(
+            "📅 Trimestre:",
+            ["1 Trimestre", "2 Trimestre", "3 Trimestre"],
+            key="stats_trimestre"
+        )
     with col3:
         alumnos_disponibles = obtener_alumnos_disponibles()
-        alumno_stats = st.selectbox("👤 Seleccionar Alumno:", alumnos_disponibles, key="stats_alumno")
-    
+        alumno_stats = st.selectbox(
+            "👤 Alumno:",
+            alumnos_disponibles,
+            key="stats_alumno"
+        )
+
     st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("📈 Generar Estadísticas", type="primary", key="btn_generar_stats"):
-            st.success("✅ Estadísticas generadas!")
-    with col2:
-        st.write("")
-    with col3:
-        st.write("")
-    
-    st.markdown("---")
-    
-    st.subheader("📊 Estadísticas Individuales Detalladas")
+
     try:
         df_stats = pd.read_excel(archivo_excel, sheet_name=trimestre_stats)
-        
+
         if curso_stats != "Todos":
             df_stats = df_stats[df_stats["Curso"] == curso_stats]
-        
         if alumno_stats != "Todos":
             df_stats = df_stats[df_stats["Apellido y Nombre"] == alumno_stats]
-        
+
         if not df_stats.empty:
             for idx, row in df_stats.iterrows():
-                if pd.notna(row["Apellido y Nombre"]):
-                    st.write(f"## 📊 Estadísticas de: {row['Apellido y Nombre']}")
-                    st.write(f"**📂 Curso:** {row['Curso']} | **📅 Trimestre:** {trimestre_stats}")
-                    st.markdown("---")
-                    
-                    st.write("### 📋 Estadísticas de Asistencia")
-                    columnas_asistencia = [col for col in df_stats.columns if any(mes in col for mes in ["Mar-", "Abr-", "May-"])]
-                    presentes = sum(1 for col in columnas_asistencia if pd.notna(row[col]) and row[col] == "Presente")
-                    totales = sum(1 for col in columnas_asistencia if pd.notna(row[col]))
+                if pd.notna(row.get("Apellido y Nombre")):
+
+                    # Encabezado del alumno
+                    st.markdown(f"""
+                    <div style='background:linear-gradient(135deg,#1e3a5f,#2d6a9f);
+                    padding:16px 20px;border-radius:12px;margin-bottom:16px;'>
+                        <div style='font-size:20px;font-weight:700;color:white;'>
+                            👤 {row['Apellido y Nombre']}
+                        </div>
+                        <div style='color:#a8c8e8;font-size:14px;margin-top:4px;'>
+                            📂 {row['Curso']} &nbsp;|&nbsp; 📅 {trimestre_stats}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # ── ASISTENCIA ──────────────────────────
+                    st.markdown('<div class="seccion-titulo">📋 ASISTENCIA</div>',
+                                unsafe_allow_html=True)
+
+                    columnas_asistencia = [
+                        col for col in df_stats.columns
+                        if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-"])
+                    ]
+                    presentes = sum(
+                        1 for col in columnas_asistencia
+                        if pd.notna(row.get(col)) and row.get(col) == "Presente"
+                    )
+                    totales = sum(
+                        1 for col in columnas_asistencia
+                        if pd.notna(row.get(col))
+                    )
                     ausentes = totales - presentes
-                    porcentaje = (presentes / totales * 100) if totales > 0 else 0
-                    
+                    porcentaje = round((presentes / totales * 100), 1) if totales > 0 else 0
+                    nota_asistencia = calcular_nota_asistencia(presentes, totales)
+
+                    # Badge de calificación asistencia
+                    if nota_asistencia == 10:
+                        badge_asist = '<span class="badge-ex">EX — 10</span>'
+                        color_asist = "#1a7a4a"
+                    elif nota_asistencia == 8:
+                        badge_asist = '<span class="badge-b">B — 8</span>'
+                        color_asist = "#4a90d9"
+                    else:
+                        badge_asist = '<span class="badge-m">M — 5</span>'
+                        color_asist = "#c0392b"
+
                     col1, col2, col3, col4 = st.columns(4)
-                    with col1: st.metric("📊 Días Presentes", presentes)
-                    with col2: st.metric("📊 Días Ausentes", ausentes)
-                    with col3: st.metric("📊 Total Días", totales)
-                    with col4: st.metric("📊 % Asistencia", f"{porcentaje:.1f}%")
-                    
-                    st.markdown("---")
-                    st.write("### 📝 Estadísticas de Evaluaciones Detalladas")
+                    with col1:
+                        st.markdown(f"""<div class="stat-card">
+                            <div class="stat-title">Días Presentes</div>
+                            <div class="stat-value">{presentes}</div>
+                            <div class="stat-sub">de {totales} clases</div>
+                        </div>""", unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f"""<div class="stat-card">
+                            <div class="stat-title">Días Ausentes</div>
+                            <div class="stat-value">{ausentes}</div>
+                            <div class="stat-sub">faltas registradas</div>
+                        </div>""", unsafe_allow_html=True)
+                    with col3:
+                        st.markdown(f"""<div class="stat-card">
+                            <div class="stat-title">% Asistencia</div>
+                            <div class="stat-value">{porcentaje}%</div>
+                            <div class="stat-sub">{"✅ Regular" if porcentaje >= 80 else "⚠️ Irregular"}</div>
+                        </div>""", unsafe_allow_html=True)
+                    with col4:
+                        st.markdown(f"""<div class="stat-card">
+                            <div class="stat-title">Calif. Asistencia</div>
+                            <div class="stat-value">{nota_asistencia}</div>
+                            <div class="stat-sub">{badge_asist}</div>
+                        </div>""", unsafe_allow_html=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # ── EVALUACIONES ────────────────────────
+                    st.markdown('<div class="seccion-titulo">📝 EVALUACIONES</div>',
+                                unsafe_allow_html=True)
+
                     evaluaciones_detalle = []
                     calificaciones = []
-                    
+
                     for i in range(1, 7):
                         eval_col = f"Eval {i}"
                         calif_col = f"Calif {i}"
-                        if pd.notna(row[eval_col]) and pd.notna(row[calif_col]):
-                            calif_num = calificacion_a_numero(row[calif_col])
+                        if pd.notna(row.get(eval_col)) and pd.notna(row.get(calif_col)):
+                            calif_val = str(row.get(calif_col))
+                            calif_num = calificacion_a_numero(calif_val)
                             evaluaciones_detalle.append({
-                                "Evaluación": row[eval_col],
-                                "Calificación": row[calif_col],
-                                "Valor Numérico": calif_num
+                                "N°": i,
+                                "Evaluación": str(row.get(eval_col)),
+                                "Calificación": calif_val,
+                                "Valor": calif_num
                             })
                             calificaciones.append(calif_num)
-                    
+
                     if evaluaciones_detalle:
-                        df_eval_detalle = pd.DataFrame(evaluaciones_detalle)
-                        st.dataframe(df_eval_detalle, use_container_width=True)
-                        
-                        if calificaciones:
-                            promedio_final = sum(calificaciones) / len(calificaciones)
-                            max_calificacion = max(calificaciones)
-                            min_calificacion = min(calificaciones)
-                            
-                            st.markdown("---")
-                            st.write("#### 📈 Resumen Numérico de Evaluaciones")
-                            col1, col2, col3, col4 = st.columns(4)
-                            with col1: st.metric("📊 Promedio Final", f"{promedio_final:.1f}")
-                            with col2: st.metric("📊 Calificación Más Alta", f"{max_calificacion:.1f}")
-                            with col3: st.metric("📊 Calificación Más Baja", f"{min_calificacion:.1f}")
-                            with col4: st.metric("📊 Total Evaluaciones", len(calificaciones))
-                            
-                            st.markdown("---")
-                            st.write("#### 📈 Gráfico de Desempeño por Evaluación")
-                            crear_grafico_evaluaciones(evaluaciones_detalle, row["Apellido y Nombre"])
-                    
-                    st.markdown("---")
-                    st.write("### 📈 Resumen General Individual")
-                    nota_asistencia_num = calcular_nota_asistencia(presentes, totales)
-                    promedio_eval = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                    promedio_general = (nota_asistencia_num + promedio_eval) / 2 if calificaciones else nota_asistencia_num
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1: st.metric("📊 Nota Asistencia", f"{nota_asistencia_num:.1f}")
-                    with col2: st.metric("📊 Promedio Evaluaciones", f"{promedio_eval:.1f}")
-                    with col3: st.metric("📊 Promedio General", f"{promedio_general:.1f}")
-                    
+                        # Tabla estilizada
+                        for ev in evaluaciones_detalle:
+                            calif = ev["Calificación"]
+                            badges = {
+                                "EX": "badge-ex", "MB": "badge-mb",
+                                "B": "badge-b", "R+": "badge-rp",
+                                "R-": "badge-rm", "M": "badge-m"
+                            }
+                            badge_class = badges.get(calif, "badge-b")
+                            col1, col2, col3 = st.columns([1, 5, 2])
+                            with col1:
+                                st.markdown(
+                                    f"<div style='padding:8px;text-align:center;"
+                                    f"font-weight:700;color:#1e3a5f;'>#{ev['N°']}</div>",
+                                    unsafe_allow_html=True
+                                )
+                            with col2:
+                                st.markdown(
+                                    f"<div style='padding:8px;color:#2c3e50;"
+                                    f"font-size:15px;'>{ev['Evaluación']}</div>",
+                                    unsafe_allow_html=True
+                                )
+                            with col3:
+                                st.markdown(
+                                    f"<div style='padding:8px;text-align:center;'>"
+                                    f"<span class='{badge_class}'>"
+                                    f"{calif} — {ev['Valor']}</span></div>",
+                                    unsafe_allow_html=True
+                                )
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+                        promedio_eval = sum(calificaciones) / len(calificaciones)
+                        max_cal = max(calificaciones)
+                        min_cal = min(calificaciones)
+
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">Promedio Evaluaciones</div>
+                                <div class="stat-value">{promedio_eval:.1f}</div>
+                                <div class="stat-sub">sobre 10 puntos</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">Calificación Más Alta</div>
+                                <div class="stat-value">{max_cal}</div>
+                                <div class="stat-sub">mejor resultado</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col3:
+                            st.markdown(f"""<div class="stat-card">
+                                <div class="stat-title">Calificación Más Baja</div>
+                                <div class="stat-value">{min_cal}</div>
+                                <div class="stat-sub">resultado a mejorar</div>
+                            </div>""", unsafe_allow_html=True)
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+                        # ── RESUMEN GENERAL ──────────────────
+                        st.markdown(
+                            '<div class="seccion-titulo">🏆 RESUMEN GENERAL</div>',
+                            unsafe_allow_html=True
+                        )
+
+                        promedio_general = (nota_asistencia + promedio_eval) / 2
+
+                        if promedio_general >= 9:
+                            color_gral = "#1a7a4a"
+                            texto_gral = "Rendimiento Excelente"
+                        elif promedio_general >= 8:
+                            color_gral = "#2d6a9f"
+                            texto_gral = "Muy Buen Rendimiento"
+                        elif promedio_general >= 7:
+                            color_gral = "#4a90d9"
+                            texto_gral = "Buen Rendimiento"
+                        elif promedio_general >= 6:
+                            color_gral = "#e8a020"
+                            texto_gral = "Rendimiento Regular"
+                        else:
+                            color_gral = "#c0392b"
+                            texto_gral = "Necesita Mejorar"
+
+                        st.markdown(f"""
+                        <div style='background:linear-gradient(135deg,{color_gral},{color_gral}cc);
+                        padding:20px;border-radius:12px;text-align:center;margin:10px 0;'>
+                            <div style='font-size:36px;font-weight:800;color:white;'>
+                                {promedio_general:.1f}
+                            </div>
+                            <div style='font-size:16px;color:rgba(255,255,255,0.9);
+                            font-weight:600;margin-top:4px;'>
+                                {texto_gral}
+                            </div>
+                            <div style='font-size:12px;color:rgba(255,255,255,0.7);
+                            margin-top:6px;'>
+                                Asistencia {nota_asistencia} + 
+                                Evaluaciones {promedio_eval:.1f} ÷ 2
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     break
         else:
-            st.info("📋 No hay datos para analizar")
+            st.info("📋 No hay datos para analizar. Seleccioná un alumno.")
     except Exception as e:
         st.error(f"Error: {e}")
-        st.info("📊 Agrega datos simulados para probar")
+        st.info("📊 Primero agregá datos simulados desde el Dashboard.")
 
 st.markdown("---")
