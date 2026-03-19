@@ -23,25 +23,23 @@ st.write("🚀 Configuración segura vía Streamlit Secrets")
 try:
     CREDENTIALS = dict(st.secrets["gcp_service_account"])
     CREDENTIALS["private_key"] = CREDENTIALS["private_key"].replace("\\n", "\n")
-    # ✅ CORRECCIÓN: folder_id está dentro del bloque [gcp_service_account]
-    FOLDER_ID = CREDENTIALS.pop("folder_id")
+    SHEET_ID = CREDENTIALS.pop("sheet_id")
     st.success("✅ Credenciales cargadas correctamente!")
     st.info(f"📧 Email: {CREDENTIALS['client_email']}")
-    st.info(f"📁 Carpeta destino configurada: {FOLDER_ID}")
+    st.info(f"📊 Sheet ID configurado correctamente")
 except Exception as e:
     st.error(f"❌ Error cargando credenciales: {e}")
     st.stop()
 
 st.markdown("---")
-st.subheader("🚀 Probar Conexión a Google Drive")
+st.subheader("🚀 Probar Conexión a Google Sheets")
 
 if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_container_width=True):
     try:
         import gspread
         from google.oauth2.service_account import Credentials
-        from googleapiclient.discovery import build
 
-        with st.spinner("Conectando con Google Drive..."):
+        with st.spinner("Conectando con Google Sheets..."):
 
             scope = [
                 "https://www.googleapis.com/auth/spreadsheets",
@@ -49,28 +47,12 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
             ]
 
             creds = Credentials.from_service_account_info(CREDENTIALS, scopes=scope)
-            drive_service = build("drive", "v3", credentials=creds)
-
-            file_metadata = {
-                "name": "Dashboard IES - Backup Automático",
-                "mimeType": "application/vnd.google-apps.spreadsheet",
-                "parents": [FOLDER_ID]
-            }
-
-            file = drive_service.files().create(
-                body=file_metadata,
-                fields="id, webViewLink"
-            ).execute()
-
-            file_id = file.get("id")
-            file_url = file.get("webViewLink")
-
-            st.success("✅ Conexión exitosa con Google Drive!")
-            st.info(f"📁 Spreadsheet creado en tu Drive: {file_url}")
-            st.info("🎉 El archivo está directamente en tu carpeta personal!")
-
             client = gspread.authorize(creds)
-            spreadsheet = client.open_by_key(file_id)
+
+            spreadsheet = client.open_by_key(SHEET_ID)
+
+            st.success("✅ Conexión exitosa con Google Sheets!")
+            st.info(f"📊 Sheet abierto: {spreadsheet.title}")
 
             test_data = pd.DataFrame({
                 "Test": ["Backup Configurado Automáticamente"],
@@ -81,19 +63,19 @@ if st.button("🚀 Probar Conexión y Activar Backup", type="primary", use_conta
             })
 
             try:
-                worksheet = spreadsheet.add_worksheet(title="Datos de Prueba", rows="100", cols="10")
-                worksheet.append_row(test_data.columns.tolist())
-                for _, row in test_data.iterrows():
-                    worksheet.append_row(row.tolist())
-                st.success("✅ Datos de prueba guardados correctamente!")
-            except Exception as ws_error:
-                try:
-                    worksheet = spreadsheet.get_worksheet(0)
-                    worksheet.update("A1", [test_data.columns.tolist()] + test_data.values.tolist())
-                    st.success("✅ Datos guardados (método alternativo)!")
-                except Exception as e2:
-                    st.error(f"❌ No se pudieron guardar los datos: {e2}")
+                worksheet = spreadsheet.add_worksheet(
+                    title="Datos de Prueba", rows="100", cols="10"
+                )
+            except Exception:
+                worksheet = spreadsheet.worksheet("Datos de Prueba")
 
+            worksheet.clear()
+            worksheet.append_row(test_data.columns.tolist())
+            for _, row in test_data.iterrows():
+                worksheet.append_row(row.tolist())
+
+            st.success("✅ Datos guardados correctamente en tu Google Sheet!")
+            st.info("🎉 El backup está funcionando. Revisá tu Google Drive.")
             st.balloons()
 
     except ImportError as ie:
@@ -107,7 +89,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("📁 Credenciales", "✅ Seguras")
 with col2:
-    st.metric("🔧 Carpeta", "Tu Drive Personal")
+    st.metric("🔧 Método", "Sheet existente")
 with col3:
     st.metric("📧 Email", "solpeschuk@gmail.com")
 
