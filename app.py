@@ -36,12 +36,12 @@ def calcular_nota_asistencia(presentes, totales):
     if totales == 0:
         return 0
     porcentaje = (presentes / totales) * 100
-    if porcentaje >= 90:
-        return 10
-    elif porcentaje >= 80:
-        return 8
+    if porcentaje >= 80:
+        return 10   # EX
+    elif porcentaje >= 51:
+        return 8    # Regular
     else:
-        return 5
+        return 5    # M
 
 def calificacion_a_numero(calif):
     try:
@@ -717,9 +717,9 @@ elif st.session_state.accion_actual == "asistencia":
                     st.session_state.asistencia_cambios[f"{idx}_{fecha_str}"] = presente
                 with col3:
                     if presente:
-                        st.success("✅")
+                        st.success("✅ Presente")
                     else:
-                        st.error("❌")
+                        st.error("❌ Ausente")
 
         st.markdown("---")
         col1, col2 = st.columns(2)
