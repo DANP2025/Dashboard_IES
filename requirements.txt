@@ -1,5 +1,5 @@
 streamlit
-gspread
-google-auth
-google-api-python-client
 pandas
+openpyxl
+gspread==6.1.2
+google-auth==2.29.0

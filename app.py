@@ -54,6 +54,108 @@ if 'nuevas_evaluaciones' not in st.session_state:
     st.session_state.nuevas_evaluaciones = []
 
 # Funciones del sistema
+def sincronizar_google_sheets():
+    """Sincroniza los datos locales con Google Sheets"""
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
+
+        SPREADSHEET_ID = "10sSBzhpkEPYk78jEctV6XzRoyFJpaYznQPnv9T6VpPc"
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+
+        archivo_excel = "sistema_educativo.xlsx"
+        if not os.path.exists(archivo_excel):
+            return False, "No existe el archivo Excel local. Primero agregá datos."
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        headers = [
+            "Fecha y Hora Actualización", "Apellido y Nombre", "Curso", "Trimestre",
+            "Días Presentes", "Días Ausentes", "% Asistencia", "Nota Asistencia",
+            "Eval 1 - Nombre", "Eval 1 - Calif",
+            "Eval 2 - Nombre", "Eval 2 - Calif",
+            "Eval 3 - Nombre", "Eval 3 - Calif",
+            "Eval 4 - Nombre", "Eval 4 - Calif",
+            "Eval 5 - Nombre", "Eval 5 - Calif",
+            "Eval 6 - Nombre", "Eval 6 - Calif",
+            "Promedio Final Evaluaciones"
+        ]
+
+        for trimestre_num in range(1, 4):
+            nombre_trimestre = f"{trimestre_num} Trimestre"
+
+            try:
+                ws = spreadsheet.worksheet(nombre_trimestre)
+            except Exception:
+                ws = spreadsheet.add_worksheet(title=nombre_trimestre, rows=500, cols=25)
+
+            try:
+                df = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+            except Exception:
+                continue
+
+            if df.empty:
+                continue
+
+            rows_data = [headers]
+
+            for _, row in df.iterrows():
+                if pd.isna(row.get("Apellido y Nombre")):
+                    continue
+
+                columnas_asistencia = [
+                    col for col in df.columns
+                    if any(mes in str(col) for mes in ["Mar-", "Abr-", "May-"])
+                ]
+                presentes = sum(1 for col in columnas_asistencia if pd.notna(row.get(col)) and row.get(col) == "Presente")
+                totales = sum(1 for col in columnas_asistencia if pd.notna(row.get(col)))
+                ausentes = totales - presentes
+                porcentaje = round((presentes / totales * 100), 1) if totales > 0 else 0
+                nota_asistencia = calcular_nota_asistencia(presentes, totales)
+
+                fila = [
+                    timestamp,
+                    str(row.get("Apellido y Nombre", "")),
+                    str(row.get("Curso", "")),
+                    nombre_trimestre,
+                    presentes,
+                    ausentes,
+                    f"{porcentaje}%",
+                    nota_asistencia,
+                ]
+
+                for j in range(1, 7):
+                    fila.append(str(row.get(f"Eval {j}", "")))
+                    fila.append(str(row.get(f"Calif {j}", "")))
+
+                fila.append(str(row.get("Nota Final Evaluaciones", "")))
+                rows_data.append(fila)
+
+            ws.clear()
+            ws.update(rows_data, value_input_option="USER_ENTERED")
+
+            ws.format("A1:U1", {
+                "backgroundColor": {"red": 0.212, "green": 0.380, "blue": 0.573},
+                "textFormat": {
+                    "bold": True,
+                    "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
+                },
+                "horizontalAlignment": "CENTER"
+            })
+
+        return True, f"Sincronizado correctamente a las {timestamp}"
+
+    except Exception as e:
+        return False, str(e)
+
 def crear_excel_si_no_existe():
     archivo_excel = "sistema_educativo.xlsx"
     if not os.path.exists(archivo_excel):
@@ -544,24 +646,44 @@ elif st.session_state.accion_actual == "evaluaciones":
     st.subheader("📝 Sistema de Evaluaciones - Formato Consistente")
     
     with st.expander("➕ Agregar Nueva Evaluación", expanded=False):
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
+
         with col1:
-            nuevo_nombre_eval = st.text_input("📝 Nombre de Nueva Evaluación:", key="nuevo_nombre_eval")
+            nuevo_tipo_eval = st.selectbox(
+                "Tipo",
+                ["Diagnóstico", "Físico", "Técnico", "Desempeño global"],
+                key="nuevo_tipo_eval",
+                label_visibility="visible"
+            )
         with col2:
-            nuevo_tipo_eval = st.selectbox("📋 Tipo de Evaluación:", ["Diagnóstico", "Físico", "Técnico", "Desempeño global"], key="nuevo_tipo_eval")
+            nuevo_nombre_eval = st.text_input(
+                "Nombre de la evaluación",
+                key="nuevo_nombre_eval",
+                placeholder="Ej: Test de velocidad",
+                label_visibility="visible"
+            )
         with col3:
-            if st.button("➕ Agregar Evaluación", type="primary", key="btn_agregar_nueva_eval"):
+            nueva_calif_eval = st.selectbox(
+                "Calificación",
+                ["M", "R-", "R+", "B", "MB", "EX"],
+                index=3,
+                key="nueva_calif_eval",
+                label_visibility="visible"
+            )
+        with col4:
+            st.markdown("###")
+            if st.button("➕ Agregar", type="primary", key="btn_agregar_nueva_eval"):
                 if nuevo_nombre_eval:
                     st.session_state.nuevas_evaluaciones.append({
                         "nombre": nuevo_nombre_eval,
                         "tipo": nuevo_tipo_eval,
+                        "calificacion": nueva_calif_eval,
                         "numero": len(st.session_state.nuevas_evaluaciones) + 7
                     })
-                    st.success(f"✅ Evaluación '{nuevo_nombre_eval}' agregada!")
-                    st.info(f"📋 Tipo: {nuevo_tipo_eval}")
+                    st.success(f"✅ '{nuevo_nombre_eval}' agregada!")
                     st.rerun()
                 else:
-                    st.error("❌ Por favor ingresa un nombre para la evaluación")
+                    st.error("❌ Ingresá un nombre para la evaluación")
     
     st.markdown("---")
     
@@ -683,34 +805,58 @@ elif st.session_state.accion_actual == "evaluaciones":
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("💾 Guardar Todos los Cambios", type="primary", key="guardar_todos_evaluaciones"):
-                    cambios_guardados = 0
-                    for key, cambios in st.session_state.evaluaciones_cambios.items():
-                        idx = int(key.split("_")[0])
-                        j = int(key.split("_")[1])
-                        
-                        eval_col = f"Eval {j}"
-                        calif_col = f"Calif {j}"
-                        
-                        df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
-                        df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
-                        cambios_guardados += 1
-                        
-                        calificaciones = []
-                        for i in range(1, 7):
-                            calif_col_temp = f"Calif {i}"
-                            if pd.notna(df_evaluaciones.at[idx, calif_col_temp]):
-                                calificaciones.append(calificacion_a_numero(df_evaluaciones.at[idx, calif_col_temp]))
-                        
-                        promedio_final = sum(calificaciones) / len(calificaciones) if calificaciones else 0
-                        df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
-                    
-                    if guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel):
-                        st.success(f"✅ {cambios_guardados} cambios guardados!")
-                        st.info(f"📁 Datos guardados en: {os.path.abspath(archivo_excel)}")
-                        st.session_state.evaluaciones_cambios = {}
-                        st.rerun()
-                    else:
-                        st.error("❌ Error guardando cambios")
+                    with st.spinner("Guardando cambios..."):
+                        cambios_guardados = 0
+                        try:
+                            # Aplicar cambios al dataframe
+                            for key, cambios in st.session_state.evaluaciones_cambios.items():
+                                partes = key.split("_")
+                                idx = int(partes[0])
+                                j = int(partes[1])
+
+                                eval_col = f"Eval {j}"
+                                calif_col = f"Calif {j}"
+
+                                df_evaluaciones.at[idx, eval_col] = cambios["nombre"]
+                                df_evaluaciones.at[idx, calif_col] = cambios["calificacion"]
+                                cambios_guardados += 1
+
+                            # Recalcular nota final de cada alumno
+                            for idx, row in df_evaluaciones.iterrows():
+                                if pd.notna(row.get("Apellido y Nombre")):
+                                    calificaciones_temp = []
+                                    for i in range(1, 7):
+                                        calif_val = df_evaluaciones.at[idx, f"Calif {i}"]
+                                        if pd.notna(calif_val):
+                                            calificaciones_temp.append(calificacion_a_numero(calif_val))
+                                    if calificaciones_temp:
+                                        promedio_final = sum(calificaciones_temp) / len(calificaciones_temp)
+                                        df_evaluaciones.at[idx, "Nota Final Evaluaciones"] = round(promedio_final, 1)
+
+                            # Guardar en Excel local
+                            exito_local = guardar_datos_excel(df_evaluaciones, trimestre_eval, archivo_excel)
+
+                            if exito_local:
+                                ruta_absoluta = os.path.abspath(archivo_excel)
+                                st.success(f"✅ {cambios_guardados} cambios guardados en Excel!")
+                                st.info(f"📁 Archivo guardado en: {ruta_absoluta}")
+                                st.session_state.evaluaciones_cambios = {}
+                            else:
+                                st.error("❌ Error al guardar en Excel local")
+                                st.stop()
+
+                            # Guardar en Google Sheets
+                            with st.spinner("Sincronizando con Google Sheets..."):
+                                ok, mensaje = sincronizar_google_sheets()
+                                if ok:
+                                    st.success(f"✅ Google Sheets actualizado: {mensaje}")
+                                else:
+                                    st.warning(f"⚠️ Excel guardado pero Google Sheets falló: {mensaje}")
+
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"❌ Error inesperado al guardar: {e}")
             
             with col2:
                 if st.button("🔄 Recargar Datos", type="secondary", key="recargar_evaluaciones"):
