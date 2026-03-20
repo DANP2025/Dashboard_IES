@@ -2038,6 +2038,9 @@ elif st.session_state.accion_actual == "reporte":
                     asistencia_data = []
                     presentes = 0
                     ausentes = 0
+                    total_dias = 0
+                    porcentaje = 0.0
+                    nota_asistencia = 0
                     
                     for col in columnas_asistencia:
                         if pd.notna(row[col]):
