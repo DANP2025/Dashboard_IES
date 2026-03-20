@@ -622,231 +622,197 @@ def registrar_cambio(tipo, alumno, curso, trimestre, campo, valor_anterior, valo
     except Exception:
         pass  # No interrumpir el flujo si falla el historial
 
-def generar_boletin_pdf(nombre_alumno, curso, trimestre, 
+def generar_boletin_pdf(nombre_alumno, curso, trimestre,
                          presentes, ausentes, porcentaje,
                          nota_asistencia, evaluaciones_data,
                          promedio_final):
-    """Genera un boletín PDF individual para el alumno"""
+    """Genera un boletín PDF individual usando fpdf2"""
     try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from fpdf import FPDF
         import io
 
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            rightMargin=2*cm,
-            leftMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm
-        )
+        class PDF(FPDF):
+            def header(self):
+                self.set_fill_color(30, 58, 95)
+                self.rect(0, 0, 210, 28, 'F')
+                self.set_y(6)
+                self.set_font('Helvetica', 'B', 18)
+                self.set_text_color(255, 255, 255)
+                self.cell(0, 8, 'Sistema Educativo', align='C', new_x='LMARGIN', new_y='NEXT')
+                self.set_font('Helvetica', '', 11)
+                self.set_text_color(168, 200, 232)
+                self.cell(0, 6, 'Boletin de Calificaciones', align='C', new_x='LMARGIN', new_y='NEXT')
+                self.set_text_color(0, 0, 0)
+                self.ln(6)
 
-        styles = getSampleStyleSheet()
-        elementos = []
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('Helvetica', 'I', 8)
+                self.set_text_color(128, 128, 128)
+                self.cell(0, 10, f'Generado el {datetime.now().strftime("%d/%m/%Y a las %H:%M")}', align='C')
 
-        # Estilo título
-        estilo_titulo = ParagraphStyle(
-            'titulo',
-            parent=styles['Normal'],
-            fontSize=20,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor('#1e3a5f'),
-            alignment=TA_CENTER,
-            spaceAfter=6
-        )
-        estilo_subtitulo = ParagraphStyle(
-            'subtitulo',
-            parent=styles['Normal'],
-            fontSize=12,
-            fontName='Helvetica',
-            textColor=colors.HexColor('#2d6a9f'),
-            alignment=TA_CENTER,
-            spaceAfter=4
-        )
-        estilo_seccion = ParagraphStyle(
-            'seccion',
-            parent=styles['Normal'],
-            fontSize=11,
-            fontName='Helvetica-Bold',
-            textColor=colors.white,
-            backColor=colors.HexColor('#1e3a5f'),
-            alignment=TA_LEFT,
-            leftIndent=6,
-            spaceBefore=10,
-            spaceAfter=6
-        )
-        estilo_normal = ParagraphStyle(
-            'normal',
-            parent=styles['Normal'],
-            fontSize=10,
-            fontName='Helvetica',
-            spaceAfter=4
-        )
+        pdf = PDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_margins(15, 35, 15)
 
-        # Encabezado
-        elementos.append(Paragraph("📚 Sistema Educativo", estilo_titulo))
-        elementos.append(Paragraph("Boletín de Calificaciones", estilo_subtitulo))
-        elementos.append(HRFlowable(width="100%", thickness=2, 
-                                     color=colors.HexColor('#1e3a5f')))
-        elementos.append(Spacer(1, 0.3*cm))
+        # ── Datos del alumno ──
+        pdf.set_fill_color(240, 244, 248)
+        pdf.set_draw_color(200, 210, 220)
+        pdf.set_font('Helvetica', 'B', 10)
+        pdf.set_text_color(30, 58, 95)
+        pdf.cell(30, 8, 'Alumno:', fill=True, border=1)
+        pdf.set_font('Helvetica', '', 10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(90, 8, nombre_alumno, fill=True, border=1)
+        pdf.set_font('Helvetica', 'B', 10)
+        pdf.set_text_color(30, 58, 95)
+        pdf.cell(25, 8, 'Curso:', fill=True, border=1)
+        pdf.set_font('Helvetica', '', 10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 8, curso, fill=True, border=1, new_x='LMARGIN', new_y='NEXT')
 
-        # Datos del alumno
-        tabla_alumno = Table([
-            ["Alumno:", nombre_alumno, "Curso:", curso],
-            ["Trimestre:", trimestre, "Fecha:", datetime.now().strftime("%d/%m/%Y")],
-        ], colWidths=[3*cm, 8*cm, 3*cm, 3*cm])
-        tabla_alumno.setStyle(TableStyle([
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
-            ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 10),
-            ('TEXTCOLOR', (0,0), (0,-1), colors.HexColor('#1e3a5f')),
-            ('TEXTCOLOR', (2,0), (2,-1), colors.HexColor('#1e3a5f')),
-            ('ROWBACKGROUNDS', (0,0), (-1,-1), 
-             [colors.HexColor('#f0f4f8'), colors.white]),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
-            ('PADDING', (0,0), (-1,-1), 6),
-        ]))
-        elementos.append(tabla_alumno)
-        elementos.append(Spacer(1, 0.4*cm))
+        pdf.set_font('Helvetica', 'B', 10)
+        pdf.set_text_color(30, 58, 95)
+        pdf.cell(30, 8, 'Trimestre:', fill=True, border=1)
+        pdf.set_font('Helvetica', '', 10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(90, 8, trimestre, fill=True, border=1)
+        pdf.set_font('Helvetica', 'B', 10)
+        pdf.set_text_color(30, 58, 95)
+        pdf.cell(25, 8, 'Fecha:', fill=True, border=1)
+        pdf.set_font('Helvetica', '', 10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 8, datetime.now().strftime("%d/%m/%Y"), fill=True, border=1, new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(4)
 
-        # Sección Asistencia
-        elementos.append(Paragraph("  📋  ASISTENCIA", estilo_seccion))
+        # ── Sección Asistencia ──
+        pdf.set_fill_color(30, 58, 95)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.cell(0, 8, '  ASISTENCIA', fill=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(1)
 
-        total_dias = presentes + ausentes
+        # Encabezado tabla asistencia
+        pdf.set_fill_color(45, 106, 159)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 9)
+        col_w = [38, 38, 38, 38, 28]
+        headers_asist = ['Presentes', 'Ausentes', '% Asistencia', 'Nota Asist.', 'Estado']
+        for i, h in enumerate(headers_asist):
+            pdf.cell(col_w[i], 7, h, fill=True, border=1, align='C')
+        pdf.ln()
+
+        # Datos asistencia
         if porcentaje >= 80:
-            color_asist = colors.HexColor('#1a7a4a')
-            estado_asist = "✅ Regular"
+            estado = 'Regular'
+            pdf.set_text_color(26, 122, 74)
         elif porcentaje >= 51:
-            color_asist = colors.HexColor('#e8a020')
-            estado_asist = "⚠️ Irregular"
+            estado = 'Irregular'
+            pdf.set_text_color(232, 160, 32)
         else:
-            color_asist = colors.HexColor('#c0392b')
-            estado_asist = "❌ Crítico"
+            estado = 'Critico'
+            pdf.set_text_color(192, 57, 43)
 
-        tabla_asist = Table([
-            ["Días Presentes", "Días Ausentes", "% Asistencia", "Nota Asistencia", "Estado"],
-            [str(presentes), str(ausentes), f"{porcentaje:.1f}%", 
-             str(nota_asistencia), estado_asist],
-        ], colWidths=[3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3*cm])
-        tabla_asist.setStyle(TableStyle([
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTNAME', (0,1), (-1,1), 'Helvetica'),
-            ('FONTSIZE', (0,0), (-1,-1), 10),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2d6a9f')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), 
-             [colors.HexColor('#f0f4f8')]),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
-            ('PADDING', (0,0), (-1,-1), 7),
-            ('TEXTCOLOR', (3,1), (3,1), color_asist),
-            ('FONTNAME', (3,1), (3,1), 'Helvetica-Bold'),
-        ]))
-        elementos.append(tabla_asist)
-        elementos.append(Spacer(1, 0.4*cm))
+        pdf.set_fill_color(240, 244, 248)
+        pdf.set_font('Helvetica', 'B', 10)
+        valores_asist = [str(presentes), str(ausentes), f"{porcentaje:.1f}%", str(nota_asistencia), estado]
+        for i, v in enumerate(valores_asist):
+            if i == 4:
+                pass
+            else:
+                pdf.set_text_color(0, 0, 0)
+            pdf.cell(col_w[i], 8, v, fill=True, border=1, align='C')
+        pdf.ln()
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
 
-        # Sección Evaluaciones
-        elementos.append(Paragraph("  📝  EVALUACIONES", estilo_seccion))
+        # ── Sección Evaluaciones ──
+        pdf.set_fill_color(30, 58, 95)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.cell(0, 8, '  EVALUACIONES', fill=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(1)
 
-        mapa_calif = {"EX": 10, "MB": 8, "B": 6, "R+": 5, "R-": 4, "M": 2}
+        # Encabezado tabla evaluaciones
+        pdf.set_fill_color(45, 106, 159)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.cell(12, 7, '#', fill=True, border=1, align='C')
+        pdf.cell(108, 7, 'Evaluacion', fill=True, border=1, align='C')
+        pdf.cell(30, 7, 'Calificacion', fill=True, border=1, align='C')
+        pdf.cell(30, 7, 'Valor', fill=True, border=1, align='C')
+        pdf.ln()
+
+        # Fila asistencia
+        pdf.set_fill_color(232, 245, 238)
+        pdf.set_text_color(26, 122, 74)
+        pdf.set_font('Helvetica', 'B', 9)
+        calif_asist = "EX" if nota_asistencia == 10 else ("B" if nota_asistencia == 8 else "M")
+        pdf.cell(12, 7, 'A', fill=True, border=1, align='C')
+        pdf.cell(108, 7, 'Asistencia al Trimestre', fill=True, border=1, align='C')
+        pdf.cell(30, 7, calif_asist, fill=True, border=1, align='C')
+        pdf.cell(30, 7, str(nota_asistencia), fill=True, border=1, align='C')
+        pdf.ln()
+
+        # Filas evaluaciones
         colores_calif = {
-            "EX": colors.HexColor('#1a7a4a'),
-            "MB": colors.HexColor('#2d6a9f'),
-            "B": colors.HexColor('#4a90d9'),
-            "R+": colors.HexColor('#e8a020'),
-            "R-": colors.HexColor('#d4601a'),
-            "M": colors.HexColor('#c0392b')
+            "EX": (26, 122, 74), "MB": (45, 106, 159),
+            "B": (74, 144, 217), "R+": (232, 160, 32),
+            "R-": (212, 96, 26), "M": (192, 57, 43)
         }
+        for i, ev in enumerate(evaluaciones_data):
+            fill_color = (240, 244, 248) if i % 2 == 0 else (255, 255, 255)
+            pdf.set_fill_color(*fill_color)
+            calif = ev.get("Calificación", "")
+            r, g, b = colores_calif.get(calif, (0, 0, 0))
+            pdf.set_font('Helvetica', '', 9)
+            pdf.set_text_color(0, 0, 0)
+            pdf.cell(12, 7, str(i+1), fill=True, border=1, align='C')
+            nombre_ev = str(ev.get("Evaluación", ""))[:50]
+            pdf.cell(108, 7, nombre_ev, fill=True, border=1, align='C')
+            pdf.set_text_color(r, g, b)
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.cell(30, 7, calif, fill=True, border=1, align='C')
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font('Helvetica', '', 9)
+            pdf.cell(30, 7, str(ev.get("Valor Numérico", "")), fill=True, border=1, align='C')
+            pdf.ln()
 
-        filas_eval = [["#", "Evaluación", "Calificación", "Valor"]]
-        filas_eval.append(["A", "Asistencia al Trimestre",
-                           "EX" if nota_asistencia == 10 else ("B" if nota_asistencia == 8 else "M"),
-                           str(nota_asistencia)])
+        pdf.ln(6)
 
-        for i, ev in enumerate(evaluaciones_data, 1):
-            filas_eval.append([
-                str(i),
-                ev.get("Evaluación", ""),
-                ev.get("Calificación", ""),
-                str(ev.get("Valor Numérico", ""))
-            ])
-
-        tabla_eval = Table(filas_eval, 
-                           colWidths=[1.5*cm, 9*cm, 3.5*cm, 3*cm])
-        estilos_eval = [
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 10),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2d6a9f')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('BACKGROUND', (0,1), (-1,1), colors.HexColor('#e8f5ee')),
-            ('FONTNAME', (0,1), (-1,1), 'Helvetica-Bold'),
-            ('ALIGN', (0,0), (0,-1), 'CENTER'),
-            ('ALIGN', (2,0), (-1,1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
-            ('PADDING', (0,0), (-1,-1), 7),
-            ('ROWBACKGROUNDS', (0,2), (-1,-1),
-             [colors.HexColor('#f0f4f8'), colors.white]),
-        ]
-        tabla_eval.setStyle(TableStyle(estilos_eval))
-        elementos.append(tabla_eval)
-        elementos.append(Spacer(1, 0.5*cm))
-
-        # Promedio Final
+        # ── Promedio Final ──
         if promedio_final >= 9:
-            color_final = colors.HexColor('#1a7a4a')
-            icono_final = "🟢 EXCELENTE"
+            r, g, b = 26, 122, 74
+            nivel = "EXCELENTE"
         elif promedio_final >= 8:
-            color_final = colors.HexColor('#2980b9')
-            icono_final = "🔵 MUY BUENO"
+            r, g, b = 41, 128, 185
+            nivel = "MUY BUENO"
         elif promedio_final >= 7:
-            color_final = colors.HexColor('#27ae60')
-            icono_final = "🟢 BUENO"
+            r, g, b = 39, 174, 96
+            nivel = "BUENO"
         elif promedio_final >= 6:
-            color_final = colors.HexColor('#f39c12')
-            icono_final = "🟡 REGULAR"
+            r, g, b = 243, 156, 18
+            nivel = "REGULAR"
         else:
-            color_final = colors.HexColor('#e74c3c')
-            icono_final = "🔴 NECESITA MEJORAR"
+            r, g, b = 231, 76, 60
+            nivel = "NECESITA MEJORAR"
 
-        tabla_final = Table([
-            ["🏆 PROMEDIO FINAL DEL TRIMESTRE", f"{promedio_final}", icono_final]
-        ], colWidths=[9*cm, 3*cm, 5*cm])
-        tabla_final.setStyle(TableStyle([
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (0,0), 12),
-            ('FONTSIZE', (1,0), (1,0), 22),
-            ('FONTSIZE', (2,0), (2,0), 11),
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1e3a5f')),
-            ('TEXTCOLOR', (0,0), (0,0), colors.white),
-            ('TEXTCOLOR', (1,0), (1,0), color_final),
-            ('TEXTCOLOR', (2,0), (2,0), colors.white),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('PADDING', (0,0), (-1,-1), 10),
-            ('ROWHEIGHT', (0,0), (-1,-1), 1.5*cm),
-        ]))
-        elementos.append(tabla_final)
+        pdf.set_fill_color(30, 58, 95)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 12)
+        pdf.cell(100, 12, '  PROMEDIO FINAL DEL TRIMESTRE', fill=True, border=1, align='L')
+        pdf.set_fill_color(r, g, b)
+        pdf.set_font('Helvetica', 'B', 16)
+        pdf.cell(30, 12, str(promedio_final), fill=True, border=1, align='C')
+        pdf.set_fill_color(30, 58, 95)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.cell(0, 12, f'  {nivel}', fill=True, border=1, align='L')
+        pdf.ln()
 
-        elementos.append(Spacer(1, 0.5*cm))
-        elementos.append(HRFlowable(width="100%", thickness=1,
-                                     color=colors.HexColor('#dddddd')))
-        elementos.append(Spacer(1, 0.2*cm))
-        elementos.append(Paragraph(
-            f"Documento generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}",
-            ParagraphStyle('pie', parent=styles['Normal'],
-                          fontSize=8, textColor=colors.grey,
-                          alignment=TA_CENTER)
-        ))
-
-        doc.build(elementos)
-        buffer.seek(0)
-        return buffer
+        # Generar bytes
+        pdf_bytes = pdf.output()
+        return io.BytesIO(pdf_bytes)
 
     except Exception as e:
         st.error(f"Error generando PDF: {e}")
