@@ -622,6 +622,236 @@ def registrar_cambio(tipo, alumno, curso, trimestre, campo, valor_anterior, valo
     except Exception:
         pass  # No interrumpir el flujo si falla el historial
 
+def generar_boletin_pdf(nombre_alumno, curso, trimestre, 
+                         presentes, ausentes, porcentaje,
+                         nota_asistencia, evaluaciones_data,
+                         promedio_final):
+    """Genera un boletín PDF individual para el alumno"""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        import io
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=2*cm,
+            leftMargin=2*cm,
+            topMargin=2*cm,
+            bottomMargin=2*cm
+        )
+
+        styles = getSampleStyleSheet()
+        elementos = []
+
+        # Estilo título
+        estilo_titulo = ParagraphStyle(
+            'titulo',
+            parent=styles['Normal'],
+            fontSize=20,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#1e3a5f'),
+            alignment=TA_CENTER,
+            spaceAfter=6
+        )
+        estilo_subtitulo = ParagraphStyle(
+            'subtitulo',
+            parent=styles['Normal'],
+            fontSize=12,
+            fontName='Helvetica',
+            textColor=colors.HexColor('#2d6a9f'),
+            alignment=TA_CENTER,
+            spaceAfter=4
+        )
+        estilo_seccion = ParagraphStyle(
+            'seccion',
+            parent=styles['Normal'],
+            fontSize=11,
+            fontName='Helvetica-Bold',
+            textColor=colors.white,
+            backColor=colors.HexColor('#1e3a5f'),
+            alignment=TA_LEFT,
+            leftIndent=6,
+            spaceBefore=10,
+            spaceAfter=6
+        )
+        estilo_normal = ParagraphStyle(
+            'normal',
+            parent=styles['Normal'],
+            fontSize=10,
+            fontName='Helvetica',
+            spaceAfter=4
+        )
+
+        # Encabezado
+        elementos.append(Paragraph("📚 Sistema Educativo", estilo_titulo))
+        elementos.append(Paragraph("Boletín de Calificaciones", estilo_subtitulo))
+        elementos.append(HRFlowable(width="100%", thickness=2, 
+                                     color=colors.HexColor('#1e3a5f')))
+        elementos.append(Spacer(1, 0.3*cm))
+
+        # Datos del alumno
+        tabla_alumno = Table([
+            ["Alumno:", nombre_alumno, "Curso:", curso],
+            ["Trimestre:", trimestre, "Fecha:", datetime.now().strftime("%d/%m/%Y")],
+        ], colWidths=[3*cm, 8*cm, 3*cm, 3*cm])
+        tabla_alumno.setStyle(TableStyle([
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+            ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 10),
+            ('TEXTCOLOR', (0,0), (0,-1), colors.HexColor('#1e3a5f')),
+            ('TEXTCOLOR', (2,0), (2,-1), colors.HexColor('#1e3a5f')),
+            ('ROWBACKGROUNDS', (0,0), (-1,-1), 
+             [colors.HexColor('#f0f4f8'), colors.white]),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
+            ('PADDING', (0,0), (-1,-1), 6),
+        ]))
+        elementos.append(tabla_alumno)
+        elementos.append(Spacer(1, 0.4*cm))
+
+        # Sección Asistencia
+        elementos.append(Paragraph("  📋  ASISTENCIA", estilo_seccion))
+
+        total_dias = presentes + ausentes
+        if porcentaje >= 80:
+            color_asist = colors.HexColor('#1a7a4a')
+            estado_asist = "✅ Regular"
+        elif porcentaje >= 51:
+            color_asist = colors.HexColor('#e8a020')
+            estado_asist = "⚠️ Irregular"
+        else:
+            color_asist = colors.HexColor('#c0392b')
+            estado_asist = "❌ Crítico"
+
+        tabla_asist = Table([
+            ["Días Presentes", "Días Ausentes", "% Asistencia", "Nota Asistencia", "Estado"],
+            [str(presentes), str(ausentes), f"{porcentaje:.1f}%", 
+             str(nota_asistencia), estado_asist],
+        ], colWidths=[3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3*cm])
+        tabla_asist.setStyle(TableStyle([
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTNAME', (0,1), (-1,1), 'Helvetica'),
+            ('FONTSIZE', (0,0), (-1,-1), 10),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2d6a9f')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), 
+             [colors.HexColor('#f0f4f8')]),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
+            ('PADDING', (0,0), (-1,-1), 7),
+            ('TEXTCOLOR', (3,1), (3,1), color_asist),
+            ('FONTNAME', (3,1), (3,1), 'Helvetica-Bold'),
+        ]))
+        elementos.append(tabla_asist)
+        elementos.append(Spacer(1, 0.4*cm))
+
+        # Sección Evaluaciones
+        elementos.append(Paragraph("  📝  EVALUACIONES", estilo_seccion))
+
+        mapa_calif = {"EX": 10, "MB": 8, "B": 6, "R+": 5, "R-": 4, "M": 2}
+        colores_calif = {
+            "EX": colors.HexColor('#1a7a4a'),
+            "MB": colors.HexColor('#2d6a9f'),
+            "B": colors.HexColor('#4a90d9'),
+            "R+": colors.HexColor('#e8a020'),
+            "R-": colors.HexColor('#d4601a'),
+            "M": colors.HexColor('#c0392b')
+        }
+
+        filas_eval = [["#", "Evaluación", "Calificación", "Valor"]]
+        filas_eval.append(["A", "Asistencia al Trimestre",
+                           "EX" if nota_asistencia == 10 else ("B" if nota_asistencia == 8 else "M"),
+                           str(nota_asistencia)])
+
+        for i, ev in enumerate(evaluaciones_data, 1):
+            filas_eval.append([
+                str(i),
+                ev.get("Evaluación", ""),
+                ev.get("Calificación", ""),
+                str(ev.get("Valor Numérico", ""))
+            ])
+
+        tabla_eval = Table(filas_eval, 
+                           colWidths=[1.5*cm, 9*cm, 3.5*cm, 3*cm])
+        estilos_eval = [
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 10),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2d6a9f')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('BACKGROUND', (0,1), (-1,1), colors.HexColor('#e8f5ee')),
+            ('FONTNAME', (0,1), (-1,1), 'Helvetica-Bold'),
+            ('ALIGN', (0,0), (0,-1), 'CENTER'),
+            ('ALIGN', (2,0), (-1,1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dddddd')),
+            ('PADDING', (0,0), (-1,-1), 7),
+            ('ROWBACKGROUNDS', (0,2), (-1,-1),
+             [colors.HexColor('#f0f4f8'), colors.white]),
+        ]
+        tabla_eval.setStyle(TableStyle(estilos_eval))
+        elementos.append(tabla_eval)
+        elementos.append(Spacer(1, 0.5*cm))
+
+        # Promedio Final
+        if promedio_final >= 9:
+            color_final = colors.HexColor('#1a7a4a')
+            icono_final = "🟢 EXCELENTE"
+        elif promedio_final >= 8:
+            color_final = colors.HexColor('#2980b9')
+            icono_final = "🔵 MUY BUENO"
+        elif promedio_final >= 7:
+            color_final = colors.HexColor('#27ae60')
+            icono_final = "🟢 BUENO"
+        elif promedio_final >= 6:
+            color_final = colors.HexColor('#f39c12')
+            icono_final = "🟡 REGULAR"
+        else:
+            color_final = colors.HexColor('#e74c3c')
+            icono_final = "🔴 NECESITA MEJORAR"
+
+        tabla_final = Table([
+            ["🏆 PROMEDIO FINAL DEL TRIMESTRE", f"{promedio_final}", icono_final]
+        ], colWidths=[9*cm, 3*cm, 5*cm])
+        tabla_final.setStyle(TableStyle([
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (0,0), 12),
+            ('FONTSIZE', (1,0), (1,0), 22),
+            ('FONTSIZE', (2,0), (2,0), 11),
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1e3a5f')),
+            ('TEXTCOLOR', (0,0), (0,0), colors.white),
+            ('TEXTCOLOR', (1,0), (1,0), color_final),
+            ('TEXTCOLOR', (2,0), (2,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('PADDING', (0,0), (-1,-1), 10),
+            ('ROWHEIGHT', (0,0), (-1,-1), 1.5*cm),
+        ]))
+        elementos.append(tabla_final)
+
+        elementos.append(Spacer(1, 0.5*cm))
+        elementos.append(HRFlowable(width="100%", thickness=1,
+                                     color=colors.HexColor('#dddddd')))
+        elementos.append(Spacer(1, 0.2*cm))
+        elementos.append(Paragraph(
+            f"Documento generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}",
+            ParagraphStyle('pie', parent=styles['Normal'],
+                          fontSize=8, textColor=colors.grey,
+                          alignment=TA_CENTER)
+        ))
+
+        doc.build(elementos)
+        buffer.seek(0)
+        return buffer
+
+    except Exception as e:
+        st.error(f"Error generando PDF: {e}")
+        return None
+
 archivo_excel = crear_excel_si_no_existe()
 
 # Sidebar con botones de navegación
@@ -1792,6 +2022,41 @@ elif st.session_state.accion_actual == "estadistica":
                             </div>
                             """, unsafe_allow_html=True)
                         break
+                    
+                    st.markdown("---")
+                    st.markdown("### 📄 Exportar Boletín")
+                    
+                    col_pdf1, col_pdf2 = st.columns([2, 1])
+                    with col_pdf1:
+                        st.info("📱 Descargá el boletín en PDF para imprimir o compartir por WhatsApp")
+                    with col_pdf2:
+                        if st.button("📄 Generar Boletín PDF", 
+                                     type="primary",
+                                     key="btn_generar_pdf",
+                                     use_container_width=True):
+                            with st.spinner("Generando PDF..."):
+                                pdf_buffer = generar_boletin_pdf(
+                                    nombre_alumno=row["Apellido y Nombre"],
+                                    curso=row["Curso"],
+                                    trimestre=trimestre_reporte,
+                                    presentes=presentes,
+                                    ausentes=ausentes,
+                                    porcentaje=porcentaje,
+                                    nota_asistencia=nota_asistencia,
+                                    evaluaciones_data=evaluaciones_data,
+                                    promedio_final=promedio_final_trimestre
+                                )
+                                if pdf_buffer:
+                                    nombre_archivo = f"boletin_{row['Apellido y Nombre'].replace(', ', '_').replace(' ', '_')}_{trimestre_reporte.replace(' ', '_')}.pdf"
+                                    st.download_button(
+                                        label="⬇️ Descargar PDF",
+                                        data=pdf_buffer,
+                                        file_name=nombre_archivo,
+                                        mime="application/pdf",
+                                        use_container_width=True,
+                                        key="btn_download_pdf"
+                                    )
+                                    st.success("✅ PDF listo para descargar!")
             else:
                 st.info("📋 No hay datos para analizar. Seleccioná un alumno.")
         except Exception as e:
