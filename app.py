@@ -2058,11 +2058,13 @@ elif st.session_state.accion_actual == "reporte":
                         st.markdown("#### 📅 Calendario de Asistencia")
 
                         # Mapeo de prefijos de mes a número de mes y año
+                        anio_actual = datetime.now().year
                         mes_a_numero = {
-                            "Mar": (3, 2026), "Abr": (4, 2026), "May": (5, 2026),
-                            "Jun": (6, 2026), "Jul": (7, 2026), "Ago": (8, 2026),
-                            "Sep": (9, 2026), "Oct": (10, 2026), "Nov": (11, 2026),
-                            "Dic": (12, 2026)
+                            "Mar": (3, anio_actual), "Abr": (4, anio_actual),
+                            "May": (5, anio_actual), "Jun": (6, anio_actual),
+                            "Jul": (7, anio_actual), "Ago": (8, anio_actual),
+                            "Sep": (9, anio_actual), "Oct": (10, anio_actual),
+                            "Nov": (11, anio_actual), "Dic": (12, anio_actual)
                         }
 
                         # Meses según trimestre seleccionado
