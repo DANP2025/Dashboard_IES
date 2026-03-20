@@ -759,29 +759,10 @@ if st.session_state.accion_actual == "dashboard":
         st.error(f"Error calculando dashboard: {e}")
 
     st.markdown("---")
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
-        if st.button("📊 Agregar Datos Simulados Completos", type="primary"):
-            with st.spinner("Generando datos..."):
-                try:
-                    if agregar_datos_simulados_completos():
-                        st.success("✅ Datos simulados agregados!")
-                        with st.spinner("Sincronizando con Google Sheets..."):
-                            ok, mensaje = sincronizar_google_sheets()
-                            if ok:
-                                st.success("✅ Google Sheets actualizado!")
-                            else:
-                                st.warning(f"⚠️ Sheets: {mensaje}")
-                        st.rerun()
-                    else:
-                        st.error("❌ Error generando datos")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
-    with col2:
         if st.button("🔄 Actualizar Dashboard", type="secondary"):
             st.rerun()
-    with col3:
-        st.write("")
 
 elif st.session_state.accion_actual == "asistencia":
     st.header("📋 Gestión de Asistencia")
