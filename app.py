@@ -532,20 +532,6 @@ def obtener_alumnos_disponibles():
     except Exception:
         return ["Todos"]
 
-def crear_grafico_asistencia(presentes, ausentes, nombre_alumno):
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(8, 4))
-    labels = ['Presentes', 'Ausentes']
-    sizes = [presentes, ausentes]
-    colors = ['#2ecc71', '#e74c3c']
-    explode = (0.1, 0)
-    
-    ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
-    ax.axis('equal')
-    plt.title(f'Asistencia - {nombre_alumno}', fontsize=14, fontweight='bold')
-    
-    return fig
-
 def crear_grafico_evaluaciones(evaluaciones_data, nombre_alumno):
     import matplotlib.pyplot as plt
     if not evaluaciones_data:
@@ -1551,7 +1537,7 @@ elif st.session_state.accion_actual == "agregar_alumno":
                 )
 
             meses_es_c = {
-                "Jan": "Jan", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
+                "Jan": "Ene", "Feb": "Feb", "Mar": "Mar", "Apr": "Abr",
                 "May": "May", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
                 "Sep": "Sep", "Oct": "Oct", "Nov": "Nov", "Dec": "Dic"
             }
