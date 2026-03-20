@@ -1588,7 +1588,8 @@ elif st.session_state.accion_actual == "estadistica":
                                   for j in range(1, 7)
                                   if pd.notna(row.get(f"Calif {j}")) and str(row.get(f"Calif {j}")).strip()]
                         prom_e = round(sum(califs) / len(califs), 1) if califs else 0
-                        prom_final = round((nota_a + prom_e) / 2, 1) if califs else nota_a
+                        todas = [nota_a] + califs
+                        prom_final = round(sum(todas) / len(todas), 1) if todas else nota_a
                         
                         # Icono de alerta
                         if pct < 51:
@@ -1816,11 +1817,6 @@ elif st.session_state.accion_actual == "estadistica":
             st.error(f"Error: {e}")
             st.info("📊 Primero agregá datos simulados desde el Dashboard.")
     
-    # Filtrar columnas de asistencia según período seleccionado
-    # (esta variable se usa más abajo en el bloque try existente)
-    if "periodo" not in dir():
-        periodo = "Trimestre completo"
-
 elif st.session_state.accion_actual == "reporte":
     st.header("📊 Reporte Individual Completo")
     st.markdown("---")
