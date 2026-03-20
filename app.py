@@ -1988,41 +1988,6 @@ elif st.session_state.accion_actual == "estadistica":
                             </div>
                             """, unsafe_allow_html=True)
                         break
-                    
-                    st.markdown("---")
-                    st.markdown("### 📄 Exportar Boletín")
-                    
-                    col_pdf1, col_pdf2 = st.columns([2, 1])
-                    with col_pdf1:
-                        st.info("📱 Descargá el boletín en PDF para imprimir o compartir por WhatsApp")
-                    with col_pdf2:
-                        if st.button("📄 Generar Boletín PDF", 
-                                     type="primary",
-                                     key="btn_generar_pdf",
-                                     use_container_width=True):
-                            with st.spinner("Generando PDF..."):
-                                pdf_buffer = generar_boletin_pdf(
-                                    nombre_alumno=row["Apellido y Nombre"],
-                                    curso=row["Curso"],
-                                    trimestre=trimestre_reporte,
-                                    presentes=presentes,
-                                    ausentes=ausentes,
-                                    porcentaje=porcentaje,
-                                    nota_asistencia=nota_asistencia,
-                                    evaluaciones_data=evaluaciones_data,
-                                    promedio_final=promedio_final_trimestre
-                                )
-                                if pdf_buffer:
-                                    nombre_archivo = f"boletin_{row['Apellido y Nombre'].replace(', ', '_').replace(' ', '_')}_{trimestre_reporte.replace(' ', '_')}.pdf"
-                                    st.download_button(
-                                        label="⬇️ Descargar PDF",
-                                        data=pdf_buffer,
-                                        file_name=nombre_archivo,
-                                        mime="application/pdf",
-                                        use_container_width=True,
-                                        key="btn_download_pdf"
-                                    )
-                                    st.success("✅ PDF listo para descargar!")
             else:
                 st.info("📋 No hay datos para analizar. Seleccioná un alumno.")
         except Exception as e:
@@ -2268,6 +2233,39 @@ elif st.session_state.accion_actual == "reporte":
                     </div>
                     """, unsafe_allow_html=True)
                     
+                    st.markdown("---")
+                    st.markdown("### 📄 Exportar Boletín")
+                    col_pdf1, col_pdf2 = st.columns([2, 1])
+                    with col_pdf1:
+                        st.info("📱 Descargá el boletín en PDF para imprimir o compartir por WhatsApp")
+                    with col_pdf2:
+                        if st.button("📄 Generar Boletín PDF",
+                                     type="primary",
+                                     key="btn_generar_pdf",
+                                     use_container_width=True):
+                            with st.spinner("Generando PDF..."):
+                                pdf_buffer = generar_boletin_pdf(
+                                    nombre_alumno=row["Apellido y Nombre"],
+                                    curso=row["Curso"],
+                                    trimestre=trimestre_reporte,
+                                    presentes=presentes,
+                                    ausentes=ausentes,
+                                    porcentaje=porcentaje,
+                                    nota_asistencia=nota_asistencia,
+                                    evaluaciones_data=evaluaciones_data,
+                                    promedio_final=promedio_final_trimestre
+                                )
+                                if pdf_buffer:
+                                    nombre_archivo = f"boletin_{row['Apellido y Nombre'].replace(', ', '_').replace(' ', '_')}_{trimestre_reporte.replace(' ', '_')}.pdf"
+                                    st.download_button(
+                                        label="⬇️ Descargar PDF",
+                                        data=pdf_buffer,
+                                        file_name=nombre_archivo,
+                                        mime="application/pdf",
+                                        use_container_width=True,
+                                        key="btn_download_pdf"
+                                    )
+                                    st.success("✅ PDF listo para descargar!")
                     break
         else:
             st.info("📋 No hay datos para mostrar")
