@@ -1143,8 +1143,27 @@ elif st.session_state.accion_actual == "evaluaciones":
         )
     
     st.markdown("---")
-    
+
     st.subheader("📝 Sistema de Evaluaciones - Formato Consistente")
+
+    # Selector de evaluación activa
+    col_ev1, col_ev2 = st.columns(2)
+    with col_ev1:
+        eval_numero_activo = st.selectbox(
+            "📝 ¿Cuál evaluación cargás hoy?",
+            ["Eval 1", "Eval 2", "Eval 3", "Eval 4", "Eval 5", "Eval 6"],
+            key="eval_numero_activo"
+        )
+    with col_ev2:
+        nombre_eval_activo = st.text_input(
+            "📋 Nombre de la evaluación:",
+            placeholder="Ej: Test de velocidad",
+            key="nombre_eval_activo"
+        )
+
+    st.markdown("---")
+    st.markdown("### 👥 ¿Quién rindió hoy?")
+    st.caption("Marcá solo los alumnos que realizaron la evaluación esta fecha")
     
     with st.expander("➕ Agregar Nueva Evaluación", expanded=False):
         col1, col2, col3, col4 = st.columns([2, 3, 2, 1])
@@ -1224,114 +1243,82 @@ elif st.session_state.accion_actual == "evaluaciones":
             st.metric("📅 Trimestre activo", trimestre_eval)
         st.markdown("---")
         
-        st.write("📝 **Evaluaciones** - Formato consistente (nombre arriba, nombre abajo)")
-        
         if 'evaluaciones_cambios' not in st.session_state:
             st.session_state.evaluaciones_cambios = {}
-        
+        if 'alumnos_rindieron' not in st.session_state:
+            st.session_state.alumnos_rindieron = {}
+
+        # Paso 1: marcar quién rindió hoy
         for idx, row in df_evaluaciones.iterrows():
             if pd.notna(row["Apellido y Nombre"]):
-                st.write(f"### **{row['Apellido y Nombre']}** - 📂 {row['Curso']}")
-                
-                # Encabezado visual
-                col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 3, 2, 2, 1])
-                with col_h1:
-                    st.caption("Nro.")
-                with col_h2:
-                    st.caption("Nombre de la evaluación")
-                with col_h3:
-                    st.caption("Calificación")
-                with col_h4:
-                    st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
-                with col_h5:
-                    st.caption("Estado")
-                
-                for j in range(1, 7):
-                    eval_col = f"Eval {j}"
-                    calif_col = f"Calif {j}"
-                    
-                    if eval_col in df_evaluaciones.columns and calif_col in df_evaluaciones.columns:
-                        col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
+                key_rindio = f"rindio_{idx}"
+                if key_rindio not in st.session_state:
+                    st.session_state[key_rindio] = False
+                rindio = st.session_state[key_rindio]
+                color_fondo = "rgba(46,204,113,0.12)" if rindio else "rgba(200,200,200,0.08)"
+                color_borde = "#2ecc71" if rindio else "#bdc3c7"
+                st.markdown(f"""
+                <div style='background:{color_fondo};border-left:4px solid {color_borde};
+                border-radius:8px;padding:8px 12px;margin:4px 0;'>
+                    <span style='font-weight:600;font-size:15px;color:#2c3e50;'>
+                        {row['Apellido y Nombre']}
+                    </span>
+                    <span style='font-size:12px;color:#7f8c8d;margin-left:8px;'>
+                        📂 {row['Curso']}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+                col_si, col_no = st.columns(2)
+                with col_si:
+                    if st.button("✅ RINDIÓ", key=f"btn_si_{idx}",
+                                 type="primary" if rindio else "secondary",
+                                 use_container_width=True):
+                        st.session_state[key_rindio] = True
+                        st.rerun()
+                with col_no:
+                    if st.button("⬜ NO RINDIÓ", key=f"btn_no_{idx}",
+                                 type="primary" if not rindio else "secondary",
+                                 use_container_width=True):
+                        st.session_state[key_rindio] = False
+                        st.rerun()
 
-                        with col1:
-                            tipo_eval = str(row.get('Tipo Evaluación', 'Diagnóstico'))
-                            st.markdown(f"**Eval {j}**")
-                            st.caption(tipo_eval)
+        # Paso 2: calificación solo para quienes rindieron
+        alumnos_que_rindieron = [
+            idx for idx, row in df_evaluaciones.iterrows()
+            if pd.notna(row.get("Apellido y Nombre")) and st.session_state.get(f"rindio_{idx}", False)
+        ]
 
-                        with col2:
-                            nombre_eval_actual = st.text_input(
-                                f"Nombre evaluación {j}",
-                                value=str(row.get(eval_col, f"Evaluación {j}")),
-                                key=f"eval_nombre_{idx}_{j}",
-                                label_visibility="collapsed"
-                            )
+        if alumnos_que_rindieron:
+            st.markdown("---")
+            st.markdown(f"### 📝 Calificaciones — {eval_numero_activo} del {fecha_evaluacion.strftime('%d/%m/%Y')}")
+            for idx in alumnos_que_rindieron:
+                row = df_evaluaciones.loc[idx]
+                st.markdown(f"**{row['Apellido y Nombre']}** — 📂 {row['Curso']}")
+                col_cal1, col_cal2 = st.columns([3, 1])
+                with col_cal1:
+                    opciones_calif = ["M", "R-", "R+", "B", "MB", "EX"]
+                    calif_actual = str(row.get(eval_numero_activo.replace("Eval ", "Calif ").replace("Eval", "Calif"), "B"))
+                    idx_cal = opciones_calif.index(calif_actual) if calif_actual in opciones_calif else 3
+                    calificacion = st.selectbox(
+                        f"Calificación",
+                        opciones_calif,
+                        index=idx_cal,
+                        key=f"eval_calif_nuevo_{idx}",
+                        label_visibility="collapsed"
+                    )
+                with col_cal2:
+                    iconos_calif = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
+                    st.markdown(f"### {iconos_calif.get(calificacion, '❓')}")
 
-                        with col3:
-                            calificacion_actual = str(row.get(calif_col, "B"))
-                            opciones_calif = ["M", "R-", "R+", "B", "MB", "EX"]
-                            idx_cal = opciones_calif.index(calificacion_actual) if calificacion_actual in opciones_calif else 3
-                            calificacion = st.selectbox(
-                                f"Calificación {j}",
-                                opciones_calif,
-                                index=idx_cal,
-                                key=f"eval_calif_{idx}_{j}",
-                                label_visibility="collapsed"
-                            )
-
-                        with col4:
-                            st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
-
-                        with col5:
-                            iconos_calif = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
-                            st.markdown(f"### {iconos_calif.get(calificacion, '❓')}")
-
-                        st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
-                            "nombre": nombre_eval_actual,
-                            "calificacion": calificacion,
-                            "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
-                        }
-                
-                # Nuevas evaluaciones — DENTRO del loop de alumnos
-                if st.session_state.nuevas_evaluaciones:
-                    for ne in st.session_state.nuevas_evaluaciones:
-                        col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 1])
-
-                        with col1:
-                            st.markdown(f"**Eval {ne['numero']}**")
-                            st.caption(ne['tipo'])
-
-                        with col2:
-                            nombre_ne = st.text_input(
-                                f"Nombre nueva eval {ne['numero']}",
-                                value=ne['nombre'],
-                                key=f"eval_nombre_nueva_{ne['numero']}_{idx}",
-                                label_visibility="collapsed"
-                            )
-
-                        with col3:
-                            opciones_ne = ["M", "R-", "R+", "B", "MB", "EX"]
-                            idx_ne = opciones_ne.index(ne['calificacion']) if ne['calificacion'] in opciones_ne else 3
-                            nueva_cal = st.selectbox(
-                                f"Calificación nueva {ne['numero']}",
-                                opciones_ne,
-                                index=idx_ne,
-                                key=f"nueva_eval_cal_{ne['numero']}_{idx}",
-                                label_visibility="collapsed"
-                            )
-                            st.session_state.evaluaciones_cambios[f"nueva_{idx}_{ne['numero']}"] = {
-                                "nombre": nombre_ne,
-                                "calificacion": nueva_cal,
-                                "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
-                            }
-
-                        with col4:
-                            st.caption(f"📅 {fecha_evaluacion.strftime('%d/%m/%Y')}")
-
-                        with col5:
-                            iconos_ne = {"EX": "🌟", "MB": "✅", "B": "🔵", "R+": "⚠️", "R-": "🔴", "M": "💔"}
-                            st.markdown(f"### {iconos_ne.get(nueva_cal, '❓')}")
-                
+                j = int(eval_numero_activo.split(" ")[1])
+                st.session_state.evaluaciones_cambios[f"{idx}_{j}"] = {
+                    "nombre": nombre_eval_activo if nombre_eval_activo else eval_numero_activo,
+                    "calificacion": calificacion,
+                    "fecha": fecha_evaluacion.strftime("%d/%m/%Y")
+                }
                 st.markdown("---")
+        else:
+            st.info("👆 Marcá los alumnos que rindieron hoy para cargar sus calificaciones")
         
         col1, col2, col3 = st.columns(3)
         with col1:
