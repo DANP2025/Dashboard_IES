@@ -1009,6 +1009,14 @@ elif st.session_state.accion_actual == "asistencia":
             st.metric("📊 Total", total_hoy)
         st.markdown("---")
 
+        # Indicador de cambios pendientes
+        cambios_pendientes_asist = any(
+            fecha_str in key
+            for key in st.session_state.get("asistencia_cambios", {}).keys()
+        )
+        if cambios_pendientes_asist:
+            st.warning("⚠️ Tenés cambios sin guardar — tocá **💾 Guardar Asistencia** antes de salir")
+
         st.write("✅ Marcá la casilla para **Presente** — sin marcar = **Ausente**")
 
         if 'asistencia_cambios' not in st.session_state:
