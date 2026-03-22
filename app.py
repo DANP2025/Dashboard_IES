@@ -1256,6 +1256,18 @@ elif st.session_state.accion_actual == "evaluaciones":
         if 'alumnos_rindieron' not in st.session_state:
             st.session_state.alumnos_rindieron = {}
 
+        # Indicador de cambios pendientes en evaluaciones
+        hay_califs_pendientes = len(st.session_state.evaluaciones_cambios) > 0
+        hay_rindieron_sin_guardar = any(
+            st.session_state.get(f"rindio_{idx}", False)
+            for idx, row in df_evaluaciones.iterrows()
+            if pd.notna(row.get("Apellido y Nombre"))
+        )
+        if hay_califs_pendientes:
+            st.warning("⚠️ Tenés calificaciones sin guardar — tocá **💾 Guardar Evaluaciones** antes de salir")
+        elif hay_rindieron_sin_guardar:
+            st.info("📝 Hay alumnos marcados como RINDIÓ — completá las calificaciones y guardá")
+
         # Paso 1: marcar quién rindió hoy
         for idx, row in df_evaluaciones.iterrows():
             if pd.notna(row["Apellido y Nombre"]):
