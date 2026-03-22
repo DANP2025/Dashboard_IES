@@ -1773,6 +1773,7 @@ elif st.session_state.accion_actual == "estadistica":
                 
                 if resumen_curso:
                     df_curso_display = pd.DataFrame(resumen_curso)
+                    df_curso_display.index = range(1, len(df_curso_display) + 1)
                     st.dataframe(df_curso_display, use_container_width=True)
                     
                     # Alumnos en riesgo
