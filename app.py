@@ -79,6 +79,92 @@ def guardar_datos_excel(df, sheet_name, archivo_excel="sistema_educativo.xlsx"):
         st.error(f"Error guardando en Excel: {e}")
         return False
 
+def reparar_trimestre_desde_otros():
+    """
+    Repara el 1er trimestre copiando alumnos faltantes desde el 2do trimestre.
+    Lee los alumnos únicos de "2 Trimestre" y agrega los que no están en "1 Trimestre"
+    con valores por defecto para asistencia y evaluaciones.
+    """
+    archivo_excel = "sistema_educativo.xlsx"
+    alumnos_agregados = 0
+    
+    try:
+        # Leer datos de ambos trimestres
+        df_1t = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
+        df_2t = pd.read_excel(archivo_excel, sheet_name="2 Trimestre")
+        
+        # Obtener alumnos únicos del 1er trimestre (Apellido y Nombre + Curso)
+        alumnos_1t = set()
+        for _, row in df_1t.iterrows():
+            if pd.notna(row.get("Apellido y Nombre")) and pd.notna(row.get("Curso")):
+                clave = (row["Apellido y Nombre"], row["Curso"])
+                alumnos_1t.add(clave)
+        
+        # Obtener alumnos únicos del 2do trimestre
+        alumnos_2t = set()
+        for _, row in df_2t.iterrows():
+            if pd.notna(row.get("Apellido y Nombre")) and pd.notna(row.get("Curso")):
+                clave = (row["Apellido y Nombre"], row["Curso"])
+                alumnos_2t.add(clave)
+        
+        # Encontrar alumnos que están en 2do trimestre pero no en 1er
+        alumnos_faltantes = alumnos_2t - alumnos_1t
+        
+        if not alumnos_faltantes:
+            return 0  # No hay alumnos faltantes
+        
+        # Preparar filas para agregar al 1er trimestre
+        nuevas_filas = []
+        
+        # Obtener estructura de columnas del 1er trimestre
+        columnas_1t = df_1t.columns.tolist()
+        
+        # Crear fila por defecto para el 1er trimestre
+        fila_defecto = {}
+        for col in columnas_1t:
+            if col in ["Apellido y Nombre", "Curso"]:
+                fila_defecto[col] = None
+            elif col.startswith(("Mar-", "Abr-", "May-")):  # Días de asistencia del 1er trimestre
+                fila_defecto[col] = "Ausente"
+            elif col in ["Nota Asistencia", "Tipo Evaluación", "Eval 1", "Calif 1", "Eval 2", "Calif 2", 
+                        "Eval 3", "Calif 3", "Eval 4", "Calif 4", "Eval 5", "Calif 5", "Eval 6", "Calif 6", 
+                        "Nota Final Evaluaciones", "Observaciones"]:
+                fila_defecto[col] = ""  # Columnas de evaluación vacías
+            else:
+                fila_defecto[col] = None
+        
+        # Para cada alumno faltante, encontrar sus datos en el 2do trimestre y crear fila
+        for nombre_alumno, curso in alumnos_faltantes:
+            # Buscar el alumno en el 2do trimestre
+            fila_alumno_2t = df_2t[(df_2t["Apellido y Nombre"] == nombre_alumno) & 
+                                 (df_2t["Curso"] == curso)]
+            
+            if not fila_alumno_2t.empty:
+                # Crear nueva fila para el 1er trimestre
+                nueva_fila = fila_defecto.copy()
+                nueva_fila["Apellido y Nombre"] = nombre_alumno
+                nueva_fila["Curso"] = curso
+                
+                nuevas_filas.append(nueva_fila)
+                alumnos_agregados += 1
+        
+        # Si hay alumnos para agregar, concatenar al DataFrame del 1er trimestre
+        if nuevas_filas:
+            df_nuevas_filas = pd.DataFrame(nuevas_filas)
+            df_1t_actualizado = pd.concat([df_1t, df_nuevas_filas], ignore_index=True)
+            
+            # Guardar el resultado en el 1er trimestre
+            if guardar_datos_excel(df_1t_actualizado, "1 Trimestre", archivo_excel):
+                return alumnos_agregados
+            else:
+                return 0
+        
+        return alumnos_agregados
+        
+    except Exception as e:
+        st.error(f"Error en reparación: {e}")
+        return 0
+
 def generar_backup_detalles():
     """Generar backup detallado en Excel con todas las columnas solicitadas"""
     try:
@@ -339,7 +425,7 @@ def sincronizar_google_sheets():
         return False, str(e)
 
 def restaurar_desde_sheets_si_vacio():
-    """Si el Excel local está vacío, restaura desde Google Sheets"""
+    """Restaura trimestres vacíos desde Google Sheets y repara si faltan cursos"""
     archivo_excel_local = "sistema_educativo.xlsx"
     try:
         if not GOOGLE_SHEETS_DISPONIBLE:
@@ -348,22 +434,52 @@ def restaurar_desde_sheets_si_vacio():
             return False
 
         wb_check = openpyxl.load_workbook(archivo_excel_local)
-        ws_check = wb_check["1 Trimestre"]
-        tiene_datos = ws_check.max_row > 1
-        wb_check.close()
-
-        if tiene_datos:
-            return False
-
-        # Excel vacío — restaurar desde Sheets
-        restaurado = False
+        se_realizo_alguna_accion = False
+        
+        # 1. Verificar cada trimestre individualmente
         for trimestre_num in range(1, 4):
             nombre_trimestre = f"{trimestre_num} Trimestre"
-            df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
-            if df_sheets is not None and not df_sheets.empty:
-                guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel_local)
-                restaurado = True
-        return restaurado
+            
+            try:
+                ws_check = wb_check[nombre_trimestre]
+                tiene_datos = ws_check.max_row > 1
+                
+                # Si el trimestre está vacío, restaurarlo desde Google Sheets
+                if not tiene_datos:
+                    df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
+                    if df_sheets is not None and not df_sheets.empty:
+                        guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel_local)
+                        se_realizo_alguna_accion = True
+            except Exception:
+                # Si no existe la hoja, intentar crearla desde Google Sheets
+                df_sheets = cargar_datos_desde_sheets(nombre_trimestre)
+                if df_sheets is not None and not df_sheets.empty:
+                    guardar_datos_excel(df_sheets, nombre_trimestre, archivo_excel_local)
+                    se_realizo_alguna_accion = True
+        
+        wb_check.close()
+        
+        # 2. Verificar si 1 Trimestre tiene menos cursos que 2 Trimestre y reparar si es necesario
+        try:
+            df_1t = pd.read_excel(archivo_excel_local, sheet_name="1 Trimestre")
+            df_2t = pd.read_excel(archivo_excel_local, sheet_name="2 Trimestre")
+            
+            # Obtener cursos únicos de cada trimestre
+            cursos_1t = set(df_1t["Curso"].dropna().unique()) if not df_1t.empty and "Curso" in df_1t.columns else set()
+            cursos_2t = set(df_2t["Curso"].dropna().unique()) if not df_2t.empty and "Curso" in df_2t.columns else set()
+            
+            # Si 1 Trimestre tiene menos cursos que 2 Trimestre, repararlo
+            if len(cursos_1t) < len(cursos_2t) and cursos_2t - cursos_1t:
+                alumnos_agregados = reparar_trimestre_desde_otros()
+                if alumnos_agregados > 0:
+                    se_realizo_alguna_accion = True
+                    
+        except Exception:
+            # Si hay error leyendo los datos para comparar, continuar sin reparar
+            pass
+        
+        return se_realizo_alguna_accion
+        
     except Exception:
         return False
 
@@ -523,11 +639,11 @@ def agregar_nuevo_alumno(nombre, curso):
         st.error(f"Error agregando alumno: {e}")
         return False
 
-def obtener_alumnos_disponibles():
+def obtener_alumnos_disponibles(trimestre="1 Trimestre"):
     archivo_excel = "sistema_educativo.xlsx"
     try:
-        df_1t = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
-        alumnos = df_1t["Apellido y Nombre"].dropna().tolist()
+        df_trimestre = pd.read_excel(archivo_excel, sheet_name=trimestre)
+        alumnos = df_trimestre["Apellido y Nombre"].dropna().tolist()
         return ["Todos"] + sorted(alumnos)
     except Exception:
         return ["Todos"]
@@ -845,6 +961,22 @@ if st.sidebar.button("💾 Guardar y Backup", type="primary", key="guardar_backu
     except Exception as e:
         st.sidebar.error(f"❌ Error Sheets: {e}")
 
+# Reparar 1er Trimestre
+if st.sidebar.button("Reparar 1er Trimestre", type="secondary", key="btn_reparar_trimestre"):
+    try:
+        with st.sidebar:
+            with st.spinner("Reparando 1er trimestre..."):
+                alumnos_agregados = reparar_trimestre_desde_otros()
+                if alumnos_agregados > 0:
+                    st.sidebar.success(f"Se agregaron {alumnos_agregados} alumnos al 1er trimestre")
+                    st.rerun()
+                elif alumnos_agregados == 0:
+                    st.sidebar.info("No hay alumnos faltantes en el 1er trimestre")
+                else:
+                    st.sidebar.error("Error al reparar el 1er trimestre")
+    except Exception as e:
+        st.sidebar.error(f"Error en reparación: {e}")
+
 if st.sidebar.button("📜 Ver Historial", type="secondary", key="btn_historial"):
     st.session_state.accion_actual = "historial"
 
@@ -940,11 +1072,88 @@ if st.session_state.accion_actual == "dashboard":
     except Exception as e:
         st.error(f"Error calculando dashboard: {e}")
 
+    # Diagnóstico del Sistema
+    with st.expander("Diagnóstico del Sistema", expanded=False):
+        st.subheader("Análisis de Datos por Trimestre")
+        
+        try:
+            diagnostic_data = []
+            
+            for trimestre_num in range(1, 4):
+                nombre_trimestre = f"{trimestre_num} Trimestre"
+                
+                try:
+                    df_trimestre = pd.read_excel(archivo_excel, sheet_name=nombre_trimestre)
+                    
+                    # Total de filas en la hoja
+                    total_filas = len(df_trimestre)
+                    
+                    # Alumnos por curso
+                    if not df_trimestre.empty and "Curso" in df_trimestre.columns and "Apellido y Nombre" in df_trimestre.columns:
+                        # Filtrar solo filas con alumnos válidos
+                        df_con_alumnos = df_trimestre[df_trimestre["Apellido y Nombre"].notna()]
+                        
+                        if not df_con_alumnos.empty:
+                            cursos_count = df_con_alumnos.groupby("Curso")["Apellido y Nombre"].count().to_dict()
+                        else:
+                            cursos_count = {}
+                        
+                        # Mostrar información del trimestre
+                        st.write(f"### {nombre_trimestre}")
+                        st.write(f"**Total de filas:** {total_filas}")
+                        
+                        if cursos_count:
+                            # Crear DataFrame para mostrar
+                            df_cursos = pd.DataFrame([
+                                {"Curso": curso, "Alumnos": count}
+                                for curso, count in cursos_count.items()
+                            ]).sort_values("Curso")
+                             
+                            st.dataframe(df_cursos, use_container_width=True)
+                             
+                            # Verificar cursos con 0 alumnos
+                            cursos_esperados = ["EF 1A", "EF 2A", "EF 1B", "EF 2B", "TD 2A", "TD 2B"]
+                            cursos_con_cero = [curso for curso in cursos_esperados if curso not in cursos_count]
+                             
+                            if cursos_con_cero:
+                                st.warning(f"**Cursos con 0 alumnos en {nombre_trimestre}:** {', '.join(cursos_con_cero)}")
+                        else:
+                            st.warning(f"**No hay alumnos válidos en {nombre_trimestre}**")
+                        
+                        st.markdown("---")
+                    else:
+                        st.error(f"**Estructura inválida en {nombre_trimestre}**")
+                        st.markdown("---")
+                        
+                except Exception as e:
+                    st.error(f"**Error leyendo {nombre_trimestre}:** {e}")
+                    st.markdown("---")
+            
+        except Exception as e:
+            st.error(f"Error general en diagnóstico: {e}")
+
     st.markdown("---")
+    
+    # Botón de reparación directo en el Dashboard
+    st.subheader("Mantenimiento del Sistema")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 Actualizar Dashboard", type="secondary"):
+        if st.button("Actualizar Dashboard", type="secondary"):
             st.rerun()
+    with col2:
+        if st.button("Reparar 1er Trimestre", type="primary"):
+            with st.spinner("Reparando 1er trimestre..."):
+                try:
+                    alumnos_agregados = reparar_trimestre_desde_otros()
+                    if alumnos_agregados > 0:
+                        st.success(f"Se agregaron {alumnos_agregados} alumnos al 1er trimestre")
+                        st.rerun()
+                    elif alumnos_agregados == 0:
+                        st.info("No hay alumnos faltantes en el 1er trimestre")
+                    else:
+                        st.error("Error al reparar el 1er trimestre")
+                except Exception as e:
+                    st.error(f"Error en reparación: {e}")
 
 elif st.session_state.accion_actual == "asistencia":
     st.header("📋 Gestión de Asistencia")
@@ -969,15 +1178,25 @@ elif st.session_state.accion_actual == "asistencia":
             if df_sheets is not None and not df_sheets.empty:
                 guardar_datos_excel(df_sheets, trimestre_asistencia, archivo_excel)
                 df_asistencia = df_sheets
-    except Exception:
+    except Exception as e:
+        st.error(f"Error leyendo archivo: {e}")
         df_asistencia = pd.DataFrame()
         if GOOGLE_SHEETS_DISPONIBLE:
             df_sheets = cargar_datos_desde_sheets(trimestre_asistencia)
             if df_sheets is not None and not df_sheets.empty:
                 df_asistencia = df_sheets
 
+    # Depuración: mostrar información del DataFrame
+    if st.session_state.get("debug_mode", False):
+        st.write(f"Debug - Trimestre: {trimestre_asistencia}")
+        st.write(f"Debug - DataFrame shape: {df_asistencia.shape}")
+        st.write(f"Debug - Cursos disponibles: {df_asistencia['Curso'].unique() if not df_asistencia.empty and 'Curso' in df_asistencia.columns else 'N/A'}")
+
     if curso_asistencia != "Todos":
-        df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
+        if not df_asistencia.empty and "Curso" in df_asistencia.columns:
+            df_asistencia = df_asistencia[df_asistencia["Curso"] == curso_asistencia]
+        else:
+            st.warning(f"No hay datos disponibles para el curso {curso_asistencia} en {trimestre_asistencia}")
 
     if not df_asistencia.empty:
         meses_es = {
@@ -1458,11 +1677,49 @@ elif st.session_state.accion_actual == "agregar_alumno":
         st.markdown("---")
         st.write("📋 **Alumnos Actuales:**")
         try:
-            df_alumnos = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
-            if not df_alumnos.empty:
-                for _, row in df_alumnos.iterrows():
-                    if pd.notna(row.get("Apellido y Nombre")):
-                        st.write(f"👤 {row['Apellido y Nombre']} — 📂 {row['Curso']}")
+            # Mostrar alumnos de todos los trimestres
+            todos_los_alumnos = []
+            
+            # Depuración: mostrar información de cada trimestre
+            for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
+                try:
+                    df_trimestre = pd.read_excel(archivo_excel, sheet_name=trimestre)
+                    st.write(f"Debug - Trimestre {trimestre}: Shape {df_trimestre.shape}, Vacío: {df_trimestre.empty}")
+                    
+                    if not df_trimestre.empty:
+                        alumnos_trimestre = []
+                        for _, row in df_trimestre.iterrows():
+                            if pd.notna(row.get("Apellido y Nombre")):
+                                alumno_info = {
+                                    "nombre": row['Apellido y Nombre'],
+                                    "curso": row['Curso'],
+                                    "trimestre": trimestre
+                                }
+                                # Evitar duplicados
+                                if not any(a["nombre"] == alumno_info["nombre"] and a["curso"] == alumno_info["curso"] for a in todos_los_alumnos):
+                                    todos_los_alumnos.append(alumno_info)
+                                    alumnos_trimestre.append(alumno_info)
+                        
+                        st.write(f"Debug - Alumnos encontrados en {trimestre}: {len(alumnos_trimestre)}")
+                        for a in alumnos_trimestre[:3]:  # Mostrar primeros 3
+                            st.write(f"  - {a['nombre']} ({a['curso']})")
+                    else:
+                        st.write(f"Debug - Trimestre {trimestre} está vacío")
+                        
+                except Exception as e:
+                    st.write(f"Debug - Error en trimestre {trimestre}: {e}")
+                    continue
+            
+            st.write(f"Debug - Total alumnos únicos: {len(todos_los_alumnos)}")
+            
+            # Mostrar alumnos únicos ordenados
+            if todos_los_alumnos:
+                alumnos_unicos = sorted(todos_los_alumnos, key=lambda x: (x['curso'], x['nombre']))
+                st.write(f"Debug - Alumnos únicos ordenados: {len(alumnos_unicos)}")
+                for alumno in alumnos_unicos:
+                    st.write(f"👤 {alumno['nombre']} — 📂 {alumno['curso']} ({alumno['trimestre']})")
+            else:
+                st.info("No hay alumnos cargados en ningún trimestre")
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -1472,8 +1729,20 @@ elif st.session_state.accion_actual == "agregar_alumno":
         st.info("Usá esta sección si te equivocaste al escribir el nombre de un alumno.")
 
         try:
-            df_edit = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
-            alumnos_lista = df_edit["Apellido y Nombre"].dropna().tolist()
+            # Obtener alumnos de todos los trimestres para edición
+            todos_los_alumnos_edit = []
+            for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
+                try:
+                    df_trimestre = pd.read_excel(archivo_excel, sheet_name=trimestre)
+                    if not df_trimestre.empty:
+                        alumnos_trimestre = df_trimestre["Apellido y Nombre"].dropna().tolist()
+                        for alumno in alumnos_trimestre:
+                            if alumno not in todos_los_alumnos_edit:
+                                todos_los_alumnos_edit.append(alumno)
+                except Exception:
+                    continue
+            
+            alumnos_lista = sorted(todos_los_alumnos_edit) if todos_los_alumnos_edit else ["Sin datos"]
 
             if alumnos_lista:
                 alumno_a_editar = st.selectbox(
@@ -1591,8 +1860,20 @@ elif st.session_state.accion_actual == "agregar_alumno":
         st.warning("⚠️ Esta acción elimina al alumno de los 3 trimestres y no se puede deshacer.")
 
         try:
-            df_del = pd.read_excel(archivo_excel, sheet_name="1 Trimestre")
-            alumnos_del = df_del["Apellido y Nombre"].dropna().tolist()
+            # Obtener alumnos de todos los trimestres para eliminación
+            todos_los_alumnos_del = []
+            for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
+                try:
+                    df_trimestre = pd.read_excel(archivo_excel, sheet_name=trimestre)
+                    if not df_trimestre.empty:
+                        alumnos_trimestre = df_trimestre["Apellido y Nombre"].dropna().tolist()
+                        for alumno in alumnos_trimestre:
+                            if alumno not in todos_los_alumnos_del:
+                                todos_los_alumnos_del.append(alumno)
+                except Exception:
+                    continue
+            
+            alumnos_del = sorted(todos_los_alumnos_del) if todos_los_alumnos_del else []
 
             if alumnos_del:
                 col1, col2 = st.columns(2)
@@ -1704,7 +1985,7 @@ elif st.session_state.accion_actual == "estadistica":
             key="stats_trimestre"
         )
     with col3:
-        alumnos_disponibles = obtener_alumnos_disponibles()
+        alumnos_disponibles = obtener_alumnos_disponibles(trimestre_stats)
         alumno_stats = st.selectbox(
             "👤 Alumno:",
             alumnos_disponibles,
@@ -1998,7 +2279,7 @@ elif st.session_state.accion_actual == "reporte":
     with col2:
         trimestre_reporte = st.selectbox("📅 Seleccionar Trimestre:", ["1 Trimestre", "2 Trimestre", "3 Trimestre"], key="reporte_trimestre")
     with col3:
-        alumnos_disponibles = obtener_alumnos_disponibles()
+        alumnos_disponibles = obtener_alumnos_disponibles(trimestre_reporte)
         alumno_reporte = st.selectbox("👤 Seleccionar Alumno:", alumnos_disponibles, key="reporte_alumno")
     
     st.markdown("---")
