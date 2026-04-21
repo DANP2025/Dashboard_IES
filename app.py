@@ -1684,7 +1684,6 @@ elif st.session_state.accion_actual == "agregar_alumno":
             for trimestre in ["1 Trimestre", "2 Trimestre", "3 Trimestre"]:
                 try:
                     df_trimestre = pd.read_excel(archivo_excel, sheet_name=trimestre)
-                    st.write(f"Debug - Trimestre {trimestre}: Shape {df_trimestre.shape}, Vacío: {df_trimestre.empty}")
                     
                     if not df_trimestre.empty:
                         alumnos_trimestre = []
@@ -1700,22 +1699,16 @@ elif st.session_state.accion_actual == "agregar_alumno":
                                     todos_los_alumnos.append(alumno_info)
                                     alumnos_trimestre.append(alumno_info)
                         
-                        st.write(f"Debug - Alumnos encontrados en {trimestre}: {len(alumnos_trimestre)}")
-                        for a in alumnos_trimestre[:3]:  # Mostrar primeros 3
-                            st.write(f"  - {a['nombre']} ({a['curso']})")
                     else:
-                        st.write(f"Debug - Trimestre {trimestre} está vacío")
+                        pass
                         
                 except Exception as e:
-                    st.write(f"Debug - Error en trimestre {trimestre}: {e}")
                     continue
             
-            st.write(f"Debug - Total alumnos únicos: {len(todos_los_alumnos)}")
             
             # Mostrar alumnos únicos ordenados
             if todos_los_alumnos:
                 alumnos_unicos = sorted(todos_los_alumnos, key=lambda x: (x['curso'], x['nombre']))
-                st.write(f"Debug - Alumnos únicos ordenados: {len(alumnos_unicos)}")
                 for alumno in alumnos_unicos:
                     st.write(f"👤 {alumno['nombre']} — 📂 {alumno['curso']} ({alumno['trimestre']})")
             else:
